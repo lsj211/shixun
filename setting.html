@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互动小说 - 设定</title>
+    <link rel="stylesheet" href="css/setting.css">
+    <!-- 可以添加一些图标库如Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 标题区 -->
+        <header>
+            <h1>互动小说创作系统</h1>
+        </header>
+
+        <!-- 模式选择区 -->
+        <section id="mode-selection">
+            <h2>请选择模式</h2>
+            <div class="mode-buttons">
+                <button id="play-mode-btn" class="mode-btn">游玩模式</button>
+                <button id="create-mode-btn" class="mode-btn">创作模式</button>
+            </div>
+        </section>
+
+        <!-- 游玩模式设定区 -->
+        <section id="play-mode-settings" class="settings-panel hidden">
+            <h2>游玩模式设定</h2>
+            <div class="setting-step" id="play-step-1">
+                <h3>步骤 1: 故事背景</h3>
+                <textarea id="play-story-background" placeholder="请输入故事背景..."></textarea>
+                <button class="next-btn">下一步</button>
+            </div>
+            
+            <div class="setting-step hidden" id="play-step-2">
+                <h3>步骤 2: 主要角色设定</h3>
+                <div id="play-characters-container">
+                    <div class="character-input">
+                        <input type="text" class="character-name" placeholder="角色名称">
+                        <textarea class="character-desc" placeholder="角色描述..."></textarea>
+                    </div>
+                </div>
+                <button class="add-character-btn"><i class="fas fa-plus"></i> 添加角色</button>
+                <div class="navigation-buttons">
+                    <button class="prev-btn">上一步</button>
+                    <button class="next-btn">下一步</button>
+                </div>
+            </div>
+            
+            <div class="setting-step hidden" id="play-step-3">
+                <h3>步骤 3: 分支复杂度</h3>
+                <div class="complexity-selector">
+                    <label>
+                        <input type="radio" name="play-complexity" value="simple"> 简单 (少量分支)
+                    </label>
+                    <label>
+                        <input type="radio" name="play-complexity" value="medium" checked> 中等 (适中分支)
+                    </label>
+                    <label>
+                        <input type="radio" name="play-complexity" value="complex"> 复杂 (多重分支)
+                    </label>
+                </div>
+                <div class="navigation-buttons">
+                    <button class="prev-btn">上一步</button>
+                    <button class="next-btn">下一步</button>
+                </div>
+            </div>
+            
+            <div class="setting-step hidden" id="play-step-4">
+                <h3>步骤 4: 章节数</h3>
+                <div class="chapter-selector">
+                    <input type="range" id="play-chapter-count" min="3" max="10" value="5">
+                    <span id="play-chapter-display">5 章</span>
+                </div>
+                <div class="navigation-buttons">
+                    <button class="prev-btn">上一步</button>
+                    <button class="start-game-btn">开始游戏</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 创作模式设定区 -->
+        <section id="create-mode-settings" class="settings-panel hidden">
+            <h2>创作模式设定</h2>
+            
+            <div class="create-mode-type">
+                <h3>创作方式选择</h3>
+                <div class="creation-type-buttons">
+                    <button id="text-based-btn" class="type-btn">文字创作</button>
+                    <button id="image-based-btn" class="type-btn">图片创作</button>
+                </div>
+            </div>
+            
+            <div id="text-based-settings" class="creation-settings hidden">
+                <div class="setting-step" id="create-text-step-1">
+                    <h3>步骤 1: 故事背景</h3>
+                    <textarea id="create-story-background" placeholder="请输入故事背景..."></textarea>
+                    <button class="next-btn">下一步</button>
+                </div>
+                
+                <!-- 其他步骤与游玩模式类似，但有所不同 -->
+                <div class="setting-step hidden" id="create-text-step-2">
+                    <h3>步骤 2: 主要角色设定</h3>
+                    <div id="create-characters-container">
+                        <div class="character-input">
+                            <input type="text" class="character-name" placeholder="角色名称">
+                            <textarea class="character-desc" placeholder="角色描述..."></textarea>
+                        </div>
+                    </div>
+                    <button class="add-character-btn"><i class="fas fa-plus"></i> 添加角色</button>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="next-btn">下一步</button>
+                    </div>
+                </div>
+                
+                <div class="setting-step hidden" id="create-text-step-3">
+                    <h3>步骤 3: 分支复杂度</h3>
+                    <div class="complexity-selector">
+                        <label>
+                            <input type="radio" name="create-complexity" value="simple"> 简单 (少量分支)
+                        </label>
+                        <label>
+                            <input type="radio" name="create-complexity" value="medium" checked> 中等 (适中分支)
+                        </label>
+                        <label>
+                            <input type="radio" name="create-complexity" value="complex"> 复杂 (多重分支)
+                        </label>
+                    </div>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="next-btn">下一步</button>
+                    </div>
+                </div>
+                
+                <div class="setting-step hidden" id="create-text-step-4">
+                    <h3>步骤 4: 章节数</h3>
+                    <div class="chapter-selector">
+                        <input type="range" id="create-chapter-count" min="3" max="15" value="5">
+                        <span id="create-chapter-display">5 章</span>
+                    </div>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="start-creation-btn">开始创作</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div id="image-based-settings" class="creation-settings hidden">
+                <div class="setting-step" id="create-image-step-1">
+                    <h3>上传参考图片</h3>
+                    <div class="image-upload-area">
+                        <input type="file" id="image-upload" accept="image/*" multiple>
+                        <label for="image-upload" class="upload-label">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                            <span>点击或拖拽图片至此处</span>
+                        </label>
+                    </div>
+                    <div id="image-preview-container" class="image-previews"></div>
+                    <button class="next-btn">下一步</button>
+                </div>
+                
+                <!-- 图片创作模式后续步骤 -->
+                <div class="setting-step hidden" id="create-image-step-2">
+                    <h3>故事元素提取</h3>
+                    <div class="image-elements">
+                        <div class="element">
+                            <h4>背景设定</h4>
+                            <textarea id="image-background" placeholder="从图片提取的背景设定..."></textarea>
+                        </div>
+                        <div class="element">
+                            <h4>角色设定</h4>
+                            <textarea id="image-characters" placeholder="从图片提取的角色设定..."></textarea>
+                        </div>
+                    </div>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="next-btn">下一步</button>
+                    </div>
+                </div>
+                
+                <!-- 剩余步骤与文字创作类似 -->
+                <div class="setting-step hidden" id="create-image-step-3">
+                    <h3>步骤 3: 分支复杂度</h3>
+                    <div class="complexity-selector">
+                        <!-- 与文字创作相同 -->
+                        <label>
+                            <input type="radio" name="create-image-complexity" value="simple"> 简单 (少量分支)
+                        </label>
+                        <label>
+                            <input type="radio" name="create-image-complexity" value="medium" checked> 中等 (适中分支)
+                        </label>
+                        <label>
+                            <input type="radio" name="create-image-complexity" value="complex"> 复杂 (多重分支)
+                        </label>
+                    </div>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="next-btn">下一步</button>
+                    </div>
+                </div>
+                
+                <div class="setting-step hidden" id="create-image-step-4">
+                    <h3>步骤 4: 章节数</h3>
+                    <div class="chapter-selector">
+                        <input type="range" id="create-image-chapter-count" min="3" max="15" value="5">
+                        <span id="create-image-chapter-display">5 章</span>
+                    </div>
+                    <div class="navigation-buttons">
+                        <button class="prev-btn">上一步</button>
+                        <button class="start-image-creation-btn">开始创作</button>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <script src="js/setting.js"></script>
+</body>
+</html>
