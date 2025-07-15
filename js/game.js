@@ -1,4 +1,4 @@
-// 游戏状态管理
+// 修改游戏状态，添加已探索节点记录
 const gameState = {
     storyBackground: "",
     characters: [],
@@ -12,48 +12,28 @@ const gameState = {
     settings: {
         complexity: "medium",
         chapterCount: 5
-    }
+    },
+    // 添加已探索节点记录
+    exploredNodes: new Set(), // 用于记录已经探索过的节点
+    currentPath: [] // 用于记录当前路径上的所有节点
 };
 
-// 示例故事内容库
+// 更新示例故事内容库，提供更具体的场景描述和选项
 const storyContent = {
     opening: {
+        id: 'node-1',
         title: "第一章：神秘的开始",
-        content: "这是一个平静的早晨，你推开窗户，发现街道上空无一人。昨晚的暴雨似乎冲刷走了城市的喧嚣，留下的只有潮湿的空气和若有若无的雾气...",
+        content: "这是一个平静的早晨，你推开窗户，发现街道上空无一人。昨晚的暴雨似乎冲刷走了城市的喧嚣，留下的只有潮湿的空气和若有若无的雾气。整个城市像是被按下了暂停键，没有行人，没有车辆，甚至连鸟叫声都听不到。",
         choices: [
             {
-                text: "调查街道的异常",
-                effect: "探索未知的环境",
-                nextContent: "你决定下楼一探究竟。街道上弥漫着一层薄雾，脚步声在寂静中格外清晰...",
-                nextChoices: [
-                    {
-                        text: "跟随一个若隐若现的身影",
-                        effect: "可能发现重要线索",
-                        nextContent: "那个身影似乎注意到了你的存在，却并没有要逃走的意思..."
-                    },
-                    {
-                        text: "检查附近的建筑",
-                        effect: "寻找更多信息",
-                        nextContent: "你注意到不远处的咖啡馆门窗大开，像是有人匆忙离开..."
-                    }
-                ]
+                text: "走出门外调查街道情况",
+                effect: "直接面对未知环境",
+                nextContent: "你决定走出门外一探究竟。踏上湿漉漉的街道，水洼倒映着灰蒙蒙的天空。街道两侧的店铺都紧闭着门窗，仿佛一夜之间所有人都消失了。在街角处，你注意到一处不寻常的痕迹，像是有什么东西被拖拽过的痕迹，通向一条小巷。"
             },
             {
-                text: "先观察周围环境",
-                effect: "谨慎收集信息",
-                nextContent: "从窗口望去，你发现街道上有一些不寻常的痕迹，像是某种仪式的残留...",
-                nextChoices: [
-                    {
-                        text: "记录下这些痕迹",
-                        effect: "保存重要证据",
-                        nextContent: "你仔细地用手机拍下了这些奇怪的标记，它们似乎组成了某种图案..."
-                    },
-                    {
-                        text: "寻找高处以获得更好的视野",
-                        effect: "扩大观察范围",
-                        nextContent: "你决定前往楼顶，从那里可以看到整个街区的情况..."
-                    }
-                ]
+                text: "先收集更多信息再行动",
+                effect: "谨慎获取情报",
+                nextContent: "你决定先收集更多信息。打开手机，发现网络信号异常微弱，社交媒体上没有任何更新，新闻频道播放的都是昨天的内容。你拨打了几个紧急电话，但都无人接听。当你望向窗外时，注意到远处一座高楼的顶层有一个闪烁的光点。"
             }
         ]
     }
@@ -62,12 +42,24 @@ const storyContent = {
 // 当前游戏状态
 let currentStoryNode = storyContent.opening;
 
-// 初始化游戏
+// 修改初始化游戏函数，确保初始节点被记录
 function initializeGame() {
+    // 确保初始节点有ID
+    if (!currentStoryNode.id) {
+        currentStoryNode.id = 'node-1';
+    }
+    
+    // 记录初始节点已被探索
+    gameState.exploredNodes.add(currentStoryNode.id);
+    gameState.currentPath.push(currentStoryNode.id);
+    
     // 显示初始内容
     updateStoryDisplay(currentStoryNode);
     // 显示初始选项
     updateChoices(currentStoryNode.choices);
+
+    // 更新侧边栏剧情树
+    updateSidePanelStoryTree();
 }
 
 // 更新故事显示
@@ -86,13 +78,32 @@ function updateStoryDisplay(node) {
     addToStoryTree(node);
 }
 
-// 更新选择按钮
+// 修改updateChoices函数，增加防御性检查
 function updateChoices(choices) {
     const choicesContainer = document.getElementById('choiceButtons');
+    
+    // 防御性检查：确保choices是一个数组且不为空
+    if (!choices || !Array.isArray(choices) || choices.length === 0) {
+        console.warn('未提供有效选项，使用默认选项');
+        choices = [
+            {
+                text: "继续探索",
+                effect: "寻找更多线索",
+                nextContent: "你决定继续前进，希望能找到更多线索..."
+            },
+            {
+                text: "尝试不同方向",
+                effect: "开辟新路径",
+                nextContent: "你决定换一个方向探索，也许会有新的发现..."
+            }
+        ];
+    }
+    
+    // 更新选择按钮HTML
     choicesContainer.innerHTML = choices.map((choice, index) => `
         <button class="choice-btn" data-choice-index="${index}">
             <span class="choice-text">${choice.text}</span>
-            <span class="choice-effect">${choice.effect}</span>
+            <span class="choice-effect">${choice.effect || '未知效果'}</span>
         </button>
     `).join('');
 
@@ -102,31 +113,121 @@ function updateChoices(choices) {
         btn.addEventListener('click', handleChoiceClick);
     });
 }
-
-// 处理选择点击
+// 修改handleChoiceClick函数，添加防御性检查
 function handleChoiceClick(event) {
     const button = event.currentTarget;
     const choiceIndex = parseInt(button.dataset.choiceIndex);
+    
+    // 防御性检查：确保currentStoryNode有choices属性且不为空
+    if (!currentStoryNode || !currentStoryNode.choices || currentStoryNode.choices.length === 0) {
+        console.error('当前节点没有有效的选择项');
+        
+        // 为避免用户卡住，生成一个新的选择项
+        currentStoryNode.choices = generateChoicesForRevertedNode(currentStoryNode);
+        updateChoices(currentStoryNode.choices);
+        return;
+    }
+    
     const currentChoice = currentStoryNode.choices[choiceIndex];
+    
+    // 再次确认currentChoice存在
+    if (!currentChoice) {
+        console.error('无效的选择索引:', choiceIndex);
+        return;
+    }
 
     // 保存当前状态到历史记录
     addToHistory({
         title: currentStoryNode.title,
         content: `选择了：${currentChoice.text}`
     });
+    
+    // 确保当前节点有ID
+    if (!currentStoryNode.id) {
+        currentStoryNode.id = 'node-' + Date.now();
+    }
+    
+    // 记录当前节点已被探索
+    gameState.exploredNodes.add(currentStoryNode.id);
+    
+    // 更新当前路径
+    if (!gameState.currentPath.includes(currentStoryNode.id)) {
+        gameState.currentPath.push(currentStoryNode.id);
+    }
 
-    // 隐藏选择按钮
-    document.querySelector('.choices-container').style.opacity = '0.5';
-    document.querySelectorAll('.choice-btn').forEach(btn => {
-        btn.disabled = true;
+    // 显示加载状态
+    document.getElementById('loadingIndicator').classList.remove('hidden');
+    document.querySelector('.choices-container').classList.add('disabled');
+
+    // 检查是否是回溯后的选择，以及是否需要创建新分支
+    if (gameState.lastRevertedNodeId) {
+        // 查找原有节点信息
+        const parentNode = findNodeInStoryTree(currentStoryNode.id);
+        let existingChildForChoice = null;
+        
+        if (parentNode && parentNode.children) {
+            // 查找与当前选择相匹配的现有分支
+            existingChildForChoice = parentNode.children.find(child => {
+                // 假设我们可以通过某种方式将子节点与选择关联起来
+                // 例如，通过比较子节点标题或内容与选择内容的相似度
+                return child.title.includes(currentChoice.text) || 
+                       child.content.includes(currentChoice.nextContent);
+            });
+        }
+        
+        if (existingChildForChoice) {
+            // 如果找到匹配的分支，直接使用该分支的内容继续故事
+            updateStoryWithExistingNode(existingChildForChoice);
+            
+            // 隐藏加载状态
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.querySelector('.choices-container').classList.remove('disabled');
+            
+            // 清除回溯标记
+            gameState.lastRevertedNodeId = null;
+            return;
+        }
+        // 否则将继续执行，创建新的分支
+    }
+
+    // 生成新的故事内容
+    generateNextContent(currentChoice).then(newContent => {
+        // 更新故事显示
+        updateStoryWithNewContent(newContent);
+        
+        // 隐藏加载状态
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.querySelector('.choices-container').classList.remove('disabled');
+        
+        // 清除回溯标记
+        gameState.lastRevertedNodeId = null;
     });
+    
+    // 打印调试信息
+    console.log("选择后已探索节点:", Array.from(gameState.exploredNodes));
+}
 
-    // 显示主题选择界面
-    const themeSelection = document.getElementById('themeSelection');
-    themeSelection.classList.remove('hidden');
+// 添加使用现有节点更新故事的函数
+function updateStoryWithExistingNode(node) {
+    // 记住当前节点ID作为父节点ID
+    const parentNodeId = currentStoryNode.id;
+    
+    // 更新当前节点
+    currentStoryNode = {
+        id: node.id,
+        title: node.title,
+        content: node.content,
+        choices: node.choices,
+        parentId: parentNodeId
+    };
 
-    // 初始化主题选择
-    initializeThemeSelection(currentChoice);
+    // 记录节点已被探索
+    gameState.exploredNodes.add(currentStoryNode.id);
+    gameState.currentPath.push(currentStoryNode.id);
+    
+    // 更新显示
+    updateStoryDisplay(currentStoryNode);
+    updateChoices(node.choices);
 }
 
 // 初始化主题选择功能
@@ -172,40 +273,167 @@ function initializeThemeSelection(choice) {
     };
 }
 
-// 生成下一段故事内容
-async function generateNextContent(choice, theme) {
-    // 这里应该调用 AI API 来生成基于选择和主题的新内容
-    // 现在使用示例内容
-    return {
+// 修改生成下一段故事内容函数，提供具体的剧情选项
+async function generateNextContent(choice) {
+    // 这里应该调用 AI API 来生成基于选择的新内容
+    // 模拟故事进展，基于当前选择提供有关联的具体剧情选项
+    
+    // 获取当前剧情关键词
+    const keywords = extractKeywords(currentStoryNode.content + ' ' + choice.nextContent);
+    
+    // 根据剧情内容和关键词，生成更具体的选项
+    let newContent = {
         title: `${currentStoryNode.title} - 延展`,
-        content: `${choice.nextContent}\n\n基于${theme}主题的新发展...`,
-        choices: [
-            {
-                text: "继续探索这个方向",
-                effect: "深入发展当前剧情",
-                nextContent: "你决定继续沿着这个方向深入..."
-            },
-            {
-                text: "尝试其他可能",
-                effect: "开启新的剧情分支",
-                nextContent: "你觉得应该尝试其他的可能性..."
-            }
-        ]
+        content: `${choice.nextContent}\n\n故事继续发展...\n\n在这条昏暗的街道上，你感受到了某种异样的气息。远处隐约传来低沉的声音，而路边的灯光闪烁不定。`,
+        choices: generateSpecificChoices(choice.nextContent, keywords)
     };
+    
+    return newContent;
 }
 
-// 更新故事内容
+// 提取剧情关键词
+function extractKeywords(text) {
+    // 简单实现，将来可以用NLP技术提取更精准的关键词
+    const commonWords = ['的', '了', '你', '我', '他', '她', '它', '是', '在', '有', '和', '与', '这', '那', '将', '被'];
+    const words = text.split(/\s+|[,.!?;，。！？；]/);
+    
+    // 过滤掉常见词和短词，按出现频率排序
+    return words.filter(word => 
+        word.length > 1 && !commonWords.includes(word)
+    ).reduce((acc, word) => {
+        acc[word] = (acc[word] || 0) + 1;
+        return acc;
+    }, {});
+}
+
+// 生成具体的剧情选项
+function generateSpecificChoices(currentContent, keywords) {
+    // 基于当前剧情和关键词，生成2个具体的选择
+    
+    // 这里是模拟生成，将来可以通过API调用获取真实的选项
+    const scenarioMap = {
+        '街道': ['调查可疑的声响', '寻找附近的安全地点'],
+        '声音': ['循着声音靠近查看', '保持距离并观察动静'],
+        '薄雾': ['穿过薄雾继续前行', '绕道避开迷雾区域'],
+        '痕迹': ['仔细检查地上的痕迹', '拍照记录并寻求帮助'],
+        '建筑': ['进入建筑内部探索', '从外部观察建筑情况'],
+        '身影': ['悄悄跟踪神秘身影', '出声呼唤引起注意'],
+        '咖啡馆': ['进入咖啡馆寻找线索', '观察咖啡馆周围环境'],
+        '标记': ['触摸奇怪的标记', '记录标记并研究其含义'],
+        '高处': ['爬上高处寻找出路', '在地面寻找其他线索']
+    };
+    
+    // 提取当前内容中匹配的场景关键词
+    let matchedScenarios = [];
+    for (const key in scenarioMap) {
+        if (currentContent.includes(key)) {
+            matchedScenarios.push(key);
+        }
+    }
+    
+    // 如果没有匹配的场景，使用默认选项
+    if (matchedScenarios.length === 0) {
+        return [
+            {
+                text: "深入调查周围环境",
+                effect: "可能发现重要线索",
+                nextContent: "你小心翼翼地查看四周，注意到一些不寻常的细节..."
+            },
+            {
+                text: "寻找可能的出路",
+                effect: "找到安全路径",
+                nextContent: "你决定先确保自己的安全，开始寻找可能的离开路径..."
+            }
+        ];
+    }
+    
+    // 随机选择一个匹配的场景
+    const selectedScenario = matchedScenarios[Math.floor(Math.random() * matchedScenarios.length)];
+    const options = scenarioMap[selectedScenario];
+    
+    // 根据选定的场景生成具体选项
+    return [
+        {
+            text: options[0],
+            effect: "探索未知的风险",
+            nextContent: `你决定${options[0]}。这可能带来意想不到的发现...`
+        },
+        {
+            text: options[1],
+            effect: "更加谨慎的方法",
+            nextContent: `你选择${options[1]}，希望能以更安全的方式了解情况...`
+        }
+    ];
+}
+
+// 修改更新故事内容的函数，记录新节点ID和路径，维护父子关系
 function updateStoryWithNewContent(newContent) {
+    // 记住当前节点ID作为父节点ID
+    const parentNodeId = currentStoryNode.id;
+    
+    // 生成新节点ID (如果没有的话)
+    if (!newContent.id) {
+        newContent.id = 'node-' + Date.now();
+    }
+    
     // 更新当前节点
     currentStoryNode = {
+        id: newContent.id,
         title: newContent.title,
         content: newContent.content,
-        choices: newContent.choices
+        choices: newContent.choices,
+        parentId: parentNodeId  // 重要：记录父节点关系
     };
+
+    // 记录新节点已被探索
+    gameState.exploredNodes.add(currentStoryNode.id);
+    gameState.currentPath.push(currentStoryNode.id);
+    
+    // 更新游戏状态中的树结构
+    updateStoryTreeStructure(parentNodeId, currentStoryNode);
 
     // 更新显示
     updateStoryDisplay(currentStoryNode);
     updateChoices(newContent.choices);
+
+    // 更新侧边栏剧情树
+    updateSidePanelStoryTree();
+}
+
+// 更新游戏状态中的树结构
+function updateStoryTreeStructure(parentNodeId, childNode) {
+    // 如果游戏状态没有树，则初始化
+    if (gameState.storyTree.length === 0) {
+        gameState.storyTree = buildTempStoryTree();
+    }
+    
+    // 查找父节点
+    const parentNode = findNodeInStoryTree(parentNodeId);
+    
+    if (parentNode) {
+        // 如果找到父节点，将子节点添加到其子节点列表
+        if (!parentNode.children) {
+            parentNode.children = [];
+        }
+        
+        // 检查是否已存在该子节点
+        const existingIndex = parentNode.children.findIndex(node => node.id === childNode.id);
+        if (existingIndex >= 0) {
+            // 更新现有节点
+            parentNode.children[existingIndex] = {...childNode};
+        } else {
+            // 添加新节点
+            parentNode.children.push({...childNode});
+        }
+    } else {
+        // 如果找不到父节点，将此节点作为根节点添加
+        const existingIndex = gameState.storyTree.findIndex(node => node.id === childNode.id);
+        if (existingIndex >= 0) {
+            gameState.storyTree[existingIndex] = {...childNode};
+        } else {
+            gameState.storyTree.push({...childNode});
+        }
+    }
 }
 
 // 添加到剧情树
@@ -395,28 +623,163 @@ function initializeStoryTreeFeatures() {
     initializeTreeEditTools();
 }
 
-// 渲染完整剧情树
+// 修改渲染完整剧情树函数，添加调试信息
 function renderFullStoryTree() {
     const fullStoryTree = document.getElementById('fullStoryTree');
     fullStoryTree.innerHTML = '';
     
-    // 如果游戏状态中有剧情树数据，则使用它
-    if (gameState.storyTree.length > 0) {
-        renderStoryTreeNodes(gameState.storyTree, fullStoryTree);
-    } else {
-        // 否则使用当前故事内容构建临时剧情树
-        const tempTree = buildTempStoryTree();
-        renderStoryTreeNodes(tempTree, fullStoryTree);
-    }
+    // 打印调试信息
+    console.log("已探索节点:", Array.from(gameState.exploredNodes));
+    console.log("当前路径:", gameState.currentPath);
     
-    // 添加节点之间的连接线
-    drawNodeConnections();
+    // 根据已探索节点构建剧情树
+    const exploredTree = buildExploredStoryTree();
+    console.log("构建的剧情树:", exploredTree);
+    
+    // 渲染剧情树
+    if (exploredTree.length > 0) {
+        renderStoryTreeNodes(exploredTree, fullStoryTree);
+        
+        // 添加节点之间的连接线
+        drawNodeConnections();
+        
+        // 高亮当前路径
+        highlightCurrentPath();
+    } else {
+        // 如果没有探索过的节点，显示提示
+        const emptyTreeMessage = document.createElement('div');
+        emptyTreeMessage.className = 'empty-tree-message';
+        emptyTreeMessage.textContent = '游戏刚刚开始，尚未形成剧情树。继续游戏以探索更多分支！';
+        fullStoryTree.appendChild(emptyTreeMessage);
+    }
     
     // 初始自动调整容器大小以适应内容
     adjustContainerSize();
 
     // 添加拖动功能
     initializeDraggableTree();
+}
+
+// 修改buildExploredStoryTree函数，确保显示所有已探索节点
+function buildExploredStoryTree() {
+    // 确保当前节点已被记录
+    if (currentStoryNode && currentStoryNode.id) {
+        gameState.exploredNodes.add(currentStoryNode.id);
+    }
+    
+    console.log("构建树前的已探索节点:", Array.from(gameState.exploredNodes));
+    
+    // 创建一个包含所有已探索节点的新树
+    const exploredTree = [];
+    const nodeMap = {};
+    
+    // 第一步：创建所有已探索节点的浅拷贝
+    Array.from(gameState.exploredNodes).forEach(nodeId => {
+        // 查找节点数据
+        const nodeData = findExistingNodeData(nodeId);
+        if (nodeData) {
+            // 创建节点浅拷贝
+            const nodeCopy = { ...nodeData, children: [] };
+            nodeMap[nodeId] = nodeCopy;
+        } else {
+            // 如果找不到节点数据，则使用基本信息创建一个
+            const nodeCopy = { 
+                id: nodeId, 
+                title: `节点 ${nodeId}`, 
+                content: '内容未知',
+                children: [] 
+            };
+            nodeMap[nodeId] = nodeCopy;
+        }
+    });
+    
+    // 第二步：重建节点关系
+    Array.from(gameState.exploredNodes).forEach(nodeId => {
+        const nodeData = findExistingNodeData(nodeId);
+        if (nodeData && nodeData.parentId) {
+            // 如果节点有父节点且父节点也在已探索集合中
+            if (gameState.exploredNodes.has(nodeData.parentId)) {
+                const parentNode = nodeMap[nodeData.parentId];
+                const childNode = nodeMap[nodeId];
+                
+                // 将子节点添加到父节点的children数组中
+                if (parentNode && childNode && !parentNode.children.some(n => n.id === childNode.id)) {
+                    parentNode.children.push(childNode);
+                }
+            } else {
+                // 如果父节点未探索，将此节点视为根节点
+                if (!exploredTree.some(n => n.id === nodeId)) {
+                    exploredTree.push(nodeMap[nodeId]);
+                }
+            }
+        } else {
+            // 没有父节点的节点都是根节点
+            if (!exploredTree.some(n => n.id === nodeId)) {
+                exploredTree.push(nodeMap[nodeId]);
+            }
+        }
+    });
+    
+    // 如果找不到任何根节点，至少显示当前节点
+    if (exploredTree.length === 0 && currentStoryNode) {
+        exploredTree.push({
+            id: currentStoryNode.id || 'node-1',
+            title: currentStoryNode.title,
+            content: currentStoryNode.content,
+            children: []
+        });
+    }
+    
+    console.log("重构后的探索树:", exploredTree);
+    return exploredTree;
+}
+// 添加高亮当前路径的功能
+function highlightCurrentPath() {
+    // 清除所有高亮
+    document.querySelectorAll('.tree-node').forEach(node => {
+        node.classList.remove('current-path');
+    });
+    
+    // 高亮当前路径上的所有节点
+    gameState.currentPath.forEach(nodeId => {
+        const nodeElement = document.getElementById(nodeId);
+        if (nodeElement) {
+            nodeElement.classList.add('current-path');
+        }
+    });
+}
+
+// 在游戏状态和临时树中查找节点数据
+function findExistingNodeData(nodeId) {
+    // 首先在游戏状态中查找
+    if (gameState.storyTree && gameState.storyTree.length > 0) {
+        const result = findNodeInTree(gameState.storyTree, nodeId);
+        if (result) return result;
+    }
+    
+    // 然后在临时树中查找
+    const tempTree = buildTempStoryTree();
+    return findNodeInTree(tempTree, nodeId);
+}
+
+// 在树中递归查找节点
+function findNodeInTree(tree, nodeId) {
+    if (!tree) return null;
+    
+    // 遍历树中的每个节点
+    for (const node of tree) {
+        if (node.id === nodeId) {
+            return node;
+        }
+        
+        // 递归搜索子节点
+        if (node.children && node.children.length > 0) {
+            const result = findNodeInTree(node.children, nodeId);
+            if (result) return result;
+        }
+    }
+    
+    return null;
 }
 
 // 初始化可拖动树功能
@@ -764,7 +1127,7 @@ function calculateNodePositions(nodes, level = 0, startPos = 0) {
         }
     });
 }
-// 根据计算好的位置渲染节点 - 修复根节点居中问题
+// 修改renderNodesWithPositions函数，移除内嵌的回溯按钮
 function renderNodesWithPositions(nodes, container, level = 0, nodePositions) {
     const nodeWidth = 200;  // 节点宽度
     const verticalGap = 100;  // 垂直间隙
@@ -792,6 +1155,7 @@ function renderNodesWithPositions(nodes, container, level = 0, nodePositions) {
         nodeElement.style.left = `${nodeLeft}px`;
         nodeElement.style.top = `${nodeTop}px`;
         
+        // 移除回溯按钮，只保留标题和内容
         nodeElement.innerHTML = `
             <div class="node-title">${node.title}</div>
             <div class="node-content">${node.content}</div>
@@ -813,9 +1177,11 @@ function renderNodesWithPositions(nodes, container, level = 0, nodePositions) {
             // 选中当前节点
             nodeElement.classList.add('selected');
             
-            // 启用编辑和删除按钮
-            document.querySelector('.edit-node-btn').disabled = false;
-            document.querySelector('.delete-node-btn').disabled = false;
+            // 发布节点选择事件
+            const selectEvent = new CustomEvent('nodeSelected', { 
+                detail: { nodeId: node.id, isSelected: true }
+            });
+            document.dispatchEvent(selectEvent);
             
             // 防止事件冒泡到容器
             e.stopPropagation();
@@ -836,6 +1202,106 @@ function renderNodesWithPositions(nodes, container, level = 0, nodePositions) {
         renderNode(node, level);
     });
 }
+// 修改revertToNode函数，确保回溯节点一定有选项
+function revertToNode(nodeId) {
+    // 查找要回溯到的节点
+    const targetNode = findExistingNodeData(nodeId);
+    if (!targetNode) {
+        console.error('无法找到要回溯的节点:', nodeId);
+        return;
+    }
+    
+    // 记录回溯操作到历史记录
+    addToHistory({
+        title: "回溯",
+        content: `返回到了"${targetNode.title}"`
+    });
+    
+    // 标记当前所处的节点ID，用于后续比较选择
+    gameState.lastRevertedNodeId = nodeId;
+    
+    // 更新当前节点
+    currentStoryNode = JSON.parse(JSON.stringify(targetNode)); // 深拷贝，避免引用问题
+    
+    // 确保节点有选择项
+    if (!currentStoryNode.choices || currentStoryNode.choices.length === 0) {
+        currentStoryNode.choices = generateChoicesForRevertedNode(currentStoryNode);
+    }
+    
+    // 更新当前路径 - 确保回溯后路径正确
+    const nodeIndex = gameState.currentPath.indexOf(nodeId);
+    if (nodeIndex >= 0) {
+        // 如果节点在当前路径中，截取到该节点
+        gameState.currentPath = gameState.currentPath.slice(0, nodeIndex + 1);
+    } else {
+        // 如果节点不在当前路径中，可能需要重建路径
+        // 寻找从根节点到目标节点的路径
+        const newPath = findPathToNode(nodeId);
+        if (newPath.length > 0) {
+            gameState.currentPath = newPath;
+        } else {
+            // 如果找不到路径，则简单添加到路径末尾
+            gameState.currentPath.push(nodeId);
+        }
+    }
+    
+    console.log("回溯后的路径:", gameState.currentPath);
+    
+    // 更新显示
+    updateStoryDisplay(currentStoryNode);
+    updateChoices(currentStoryNode.choices);
+    
+    // 更新侧边栏剧情树
+    updateSidePanelStoryTree();
+
+    // 滚动到顶部以便玩家可以阅读回溯的内容
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 寻找从根节点到目标节点的路径
+function findPathToNode(targetNodeId) {
+    const path = [];
+    
+    function searchPath(nodes, currentPath) {
+        for (const node of nodes) {
+            // 试探将当前节点加入路径
+            const newPath = [...currentPath, node.id];
+            
+            // 如果找到目标节点，返回路径
+            if (node.id === targetNodeId) {
+                return newPath;
+            }
+            
+            // 如果有子节点，继续搜索
+            if (node.children && node.children.length > 0) {
+                const result = searchPath(node.children, newPath);
+                if (result.length > 0) {
+                    return result; // 找到路径就返回
+                }
+            }
+        }
+        
+        return []; // 没找到路径
+    }
+    
+    // 从游戏状态或临时树开始搜索
+    const startTree = gameState.storyTree.length > 0 ? gameState.storyTree : buildTempStoryTree();
+    return searchPath(startTree, path);
+}
+
+// 为回溯节点生成选项（增强版）
+function generateChoicesForRevertedNode(node) {
+    // 如果节点已有选项且不为空，返回原始选项
+    if (node && node.choices && node.choices.length > 0) {
+        return node.choices;
+    }
+    
+    // 根据节点内容生成更相关的选项
+    const content = node && node.content ? node.content : '';
+    const keywords = extractKeywords(content);
+    return generateSpecificChoices(content, keywords);
+}
+
 // 绘制节点之间的连接线 - 树状连接
 function drawNodeConnections() {
     // 清除旧的连接线
@@ -921,11 +1387,28 @@ function drawSvgConnection(parentNode, childNode, svgContainer) {
     path.setAttribute('marker-end', `url(#arrowhead-${parentNode.id}-${childNode.id})`);
 }
 
-// 初始化树编辑工具
+// 修改initializeTreeEditTools函数，将回溯按钮放到删除节点按钮旁边
 function initializeTreeEditTools() {
     const addNodeBtn = document.querySelector('.add-node-btn');
     const editNodeBtn = document.querySelector('.edit-node-btn');
     const deleteNodeBtn = document.querySelector('.delete-node-btn');
+    
+    // 创建并添加回溯按钮
+    const revertBtn = document.createElement('button');
+    revertBtn.className = 'revert-node-btn tree-control-btn';
+    revertBtn.innerHTML = '<i class="fas fa-history"></i> 回溯到此节点';
+    revertBtn.disabled = true; // 初始状态禁用
+    
+    // 重要修改：将回溯按钮添加到删除节点按钮的后面
+    if (deleteNodeBtn && deleteNodeBtn.parentNode) {
+        deleteNodeBtn.parentNode.insertBefore(revertBtn, deleteNodeBtn.nextSibling);
+    } else {
+        // 如果找不到删除按钮，则添加到工具栏中
+        const treeControls = document.querySelector('.tree-controls');
+        if (treeControls) {
+            treeControls.appendChild(revertBtn);
+        }
+    }
     
     // 初始状态下禁用编辑和删除按钮
     editNodeBtn.disabled = true;
@@ -963,6 +1446,26 @@ function initializeTreeEditTools() {
                 renderFullStoryTree();
             }
         }
+    });
+    
+    // 回溯到选中节点
+    revertBtn.addEventListener('click', () => {
+        const selectedNode = document.querySelector('.tree-node.selected');
+        if (selectedNode) {
+            revertToNode(selectedNode.id);
+            // 关闭模态框
+            document.getElementById('storyTreeModal').classList.remove('active');
+        }
+    });
+    
+    // 监听节点选择状态，更新按钮可用性
+    document.addEventListener('nodeSelected', (e) => {
+        const nodeId = e.detail.nodeId;
+        const isSelected = e.detail.isSelected;
+        
+        editNodeBtn.disabled = !isSelected;
+        deleteNodeBtn.disabled = !isSelected;
+        revertBtn.disabled = !isSelected;
     });
 }
 
@@ -1192,13 +1695,252 @@ function deleteStoryNode(nodeId) {
     }
 }
 
+// 初始化设定信息按钮
+function initializeSettingsInfoButton() {
+    const settingsInfoBtn = document.querySelector('.settings-info-btn');
+    const settingsInfoModal = document.getElementById('settingsInfoModal');
+    
+    settingsInfoBtn.addEventListener('click', () => {
+        updateSettingsInfoContent();
+        settingsInfoModal.classList.add('active');
+    });
+    
+    // 确保关闭按钮能关闭这个模态框
+    settingsInfoModal.querySelector('.close-modal').addEventListener('click', () => {
+        settingsInfoModal.classList.remove('active');
+    });
+}
+
+// 更新设定信息内容
+function updateSettingsInfoContent() {
+    // 从本地存储获取游戏设置
+    let gameSettings;
+    try {
+        gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    } catch (e) {
+        gameSettings = {};
+        console.error('解析游戏设置失败:', e);
+    }
+    
+    // 显示背景信息
+    const backgroundEl = document.getElementById('settingsBackground');
+    backgroundEl.textContent = gameSettings.background || '未设定故事背景';
+    
+    // 显示角色列表
+    const charactersEl = document.getElementById('settingsCharacters');
+    if (gameSettings.characters && gameSettings.characters.length > 0) {
+        charactersEl.innerHTML = gameSettings.characters.map(char => `
+            <div class="settings-character-item">
+                <h4>${char.name || '未命名角色'}</h4>
+                <p>${char.description || '无角色描述'}</p>
+            </div>
+        `).join('');
+    } else {
+        charactersEl.innerHTML = '<p>未设定角色</p>';
+    }
+    
+    // 显示复杂度
+    const complexityEl = document.getElementById('settingsComplexity');
+    let complexityClass = '';
+    let complexityText = '';
+    
+    switch(gameSettings.complexity) {
+        case 'easy':
+            complexityClass = 'complexity-easy';
+            complexityText = '简单';
+            break;
+        case 'medium':
+            complexityClass = 'complexity-medium';
+            complexityText = '中等';
+            break;
+        case 'complex':
+            complexityClass = 'complexity-complex';
+            complexityText = '复杂';
+            break;
+        default:
+            complexityClass = 'complexity-medium';
+            complexityText = '中等（默认）';
+    }
+    
+    complexityEl.innerHTML = `<span class="complexity-badge ${complexityClass}">${complexityText}</span>`;
+    
+    // 显示章节数
+    const chapterCountEl = document.getElementById('settingsChapterCount');
+    chapterCountEl.textContent = gameSettings.chapterCount || '未指定';
+}
+
+// 修改左侧剧情树面板的渲染函数，只显示当前路径
+function updateSidePanelStoryTree() {
+    const sideTreeContainer = document.getElementById('storyTree');
+    if (!sideTreeContainer) return;
+    
+    sideTreeContainer.innerHTML = '';
+    
+    // 如果当前路径为空，显示初始提示
+    if (!gameState.currentPath || gameState.currentPath.length === 0) {
+        sideTreeContainer.innerHTML = '<div class="empty-tree-message">开始游戏后将显示剧情路径</div>';
+        return;
+    }
+    
+    // 创建路径树的HTML
+    let pathHTML = '';
+    
+    // 获取路径上所有节点的数据
+    const pathNodes = gameState.currentPath.map(nodeId => {
+        const nodeData = findExistingNodeData(nodeId);
+        return nodeData || { id: nodeId, title: `未知节点 ${nodeId}` };
+    });
+    
+    // 为每个路径节点创建一个项目，按顺序排列
+    pathNodes.forEach((node, index) => {
+        const isCurrentNode = (index === pathNodes.length - 1);
+        const nodeClass = isCurrentNode ? 'side-tree-node current' : 'side-tree-node';
+        
+        pathHTML += `
+            <div class="${nodeClass}" data-node-id="${node.id}">
+                <div class="node-content">
+                    <span class="node-title">${node.title || '未命名节点'}</span>
+                </div>
+                ${index < pathNodes.length - 1 ? '<div class="path-arrow"><i class="fas fa-chevron-down"></i></div>' : ''}
+            </div>
+        `;
+    });
+    
+    sideTreeContainer.innerHTML = pathHTML;
+}
+// 更新左侧面板剧情树样式，移除可点击的视觉提示
+document.addEventListener('DOMContentLoaded', () => {
+    // 创建样式元素
+    const style = document.createElement('style');
+    style.textContent += `
+        /* 左侧面板剧情树样式 - 仅展示模式 */
+        .story-tree {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            padding: 10px;
+            overflow-y: auto;
+            max-height: calc(100% - 100px);
+        }
+        
+        .side-tree-node {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 10px;
+            position: relative;
+            /* 移除鼠标手型光标，表明不可点击 */
+            cursor: default;
+            transition: all 0.2s ease;
+        }
+        
+        /* 移除悬停效果，表明不可交互 */
+        .side-tree-node:hover {
+            background-color: #f9f9f9;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .side-tree-node.current {
+            border-color: #4CAF50;
+            background-color: #e8f5e9;
+            border-width: 2px;
+            box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+        }
+        
+        .side-tree-node .node-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+            display: block;
+            margin-bottom: 2px;
+        }
+        
+        .path-arrow {
+            display: flex;
+            justify-content: center;
+            margin: 5px 0;
+            color: #4CAF50;
+            font-size: 14px;
+        }
+        
+        .empty-tree-message {
+            color: #999;
+            text-align: center;
+            padding: 20px;
+            font-style: italic;
+        }
+        
+        /* 添加指示标签，表明这是路径展示 */
+        .story-tree::before {
+            content: '当前剧情路径';
+            display: block;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            margin-bottom: 10px;
+            font-style: italic;
+        }
+    `;
+    
+    // 将样式添加到文档头部
+    document.head.appendChild(style);
+});
+// 添加CSS样式
+document.addEventListener('DOMContentLoaded', () => {
+    // 创建样式元素
+    const style = document.createElement('style');
+    style.textContent = `
+        /* 回溯按钮样式 */
+        .revert-node-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin-left: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            display: inline-flex;
+            align-items: center;
+        }
+        
+        .revert-node-btn:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .revert-node-btn:hover:not(:disabled) {
+            background-color: #45a049;
+        }
+        
+        .revert-node-btn i {
+            margin-right: 5px;
+        }
+    `;
+    
+    // 将样式添加到文档头部
+    document.head.appendChild(style);
+});
 // 在文档加载完成后初始化游戏
 document.addEventListener('DOMContentLoaded', () => {
+    // 隐藏主题选择区域
+    const themeSelection = document.getElementById('themeSelection');
+    if (themeSelection) {
+        themeSelection.classList.add('hidden');
+        // 也可以完全移除
+        // themeSelection.remove();
+    }
+    
+    // 移除主题显示区域
+    const themeDisplayArea = document.querySelector('.selected-theme-container');
+    if (themeDisplayArea) {
+        themeDisplayArea.style.display = 'none';
+    }
+    
     initializeGame();
     initializeEditFeatures();
     initializeStoryInfoButtons();
     initializeStoryTreeFeatures(); // 初始化剧情树功能
-    
-    // 初始化确认按钮
-    document.querySelector('.confirm-theme-btn').disabled = true;
+    initializeSettingsInfoButton(); // 初始化设定信息按钮
 });

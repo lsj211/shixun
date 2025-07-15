@@ -17,8 +17,7 @@
             </div>
             <div class="tree-controls">
                 <button class="tree-btn view-tree-btn" title="查看完整剧情树"><i class="fas fa-sitemap"></i> 查看剧情树</button>
-                <button class="tree-btn edit-btn" title="编辑标题"><i class="fas fa-edit"></i> 编辑标题</button>
-                <button class="tree-btn back-btn" title="回溯剧情"><i class="fas fa-history"></i> 回溯剧情</button>
+                
             </div>
         </aside>
 
@@ -45,6 +44,12 @@
                     <p id="storyText" class="story-text"></p>
                     <button class="edit-story-btn" title="编辑剧情"><i class="fas fa-edit"></i></button>
                 </div>
+            </div>
+            
+            <!-- 加载指示器 -->
+            <div id="loadingIndicator" class="hidden">
+                <div class="spinner"></div>
+                <p>正在生成故事内容...</p>
             </div>
 
             <!-- 玩家选择区 -->
@@ -80,7 +85,8 @@
             </div>
             <div class="story-buttons">
                 <button class="control-btn story-info-btn"><i class="fas fa-book"></i> 故事背景</button>
-                <button class="control-btn character-info-btn"><i class="fas fa-users"></i> 角色设定</button>
+                <button class="control-btn character-info-btn"><i class="fas fa-users"></i> 角色</button>
+                <button class="control-btn settings-info-btn"><i class="fas fa-cogs"></i> 设定</button>
             </div>
             <div class="game-controls">
                 <button class="control-btn save-btn"><i class="fas fa-save"></i> 保存进度</button>
@@ -121,7 +127,7 @@
                     <p id="worldBackground"></p>
                 </div>
                 <div class="timeline-section">
-                    <h3>时间线</h3>
+                    <h3>前情提要</h3>
                     <div id="storyTimeline"></div>
                 </div>
                 <div class="location-section">
@@ -136,13 +142,35 @@
     <div class="modal" id="characterInfoModal">
         <div class="modal-content wide-modal">
             <span class="close-modal">&times;</span>
-            <h2>角色设定</h2>
+            <h2>角色</h2>
             <div class="character-grid" id="characterGrid">
                 <!-- 角色卡片将通过 JS 动态生成 -->
             </div>
         </div>
     </div>
 
+    <!-- 添加设定信息模态框 -->
+    <div class="modal" id="settingsInfoModal">
+        <div class="modal-content wide-modal">
+            <span class="close-modal">&times;</span>
+            <h2>游戏设定</h2>
+            <div class="settings-info-content">
+                <div class="settings-section">
+                    <h3>故事背景</h3>
+                    <p id="settingsBackground"></p>
+                </div>
+                <div class="settings-section">
+                    <h3>角色设定</h3>
+                    <div id="settingsCharacters" class="settings-characters-list"></div>
+                </div>
+                <div class="settings-section">
+                    <h3>游戏参数</h3>
+                    <p><strong>复杂度：</strong><span id="settingsComplexity"></span></p>
+                    <p><strong>章节数：</strong><span id="settingsChapterCount"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
     <!-- 剧情树模态框 -->
     <div class="modal" id="storyTreeModal">
         <div class="modal-content tree-modal">
