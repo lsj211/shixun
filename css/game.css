@@ -514,6 +514,7 @@ body {
     max-width: 1000px;
     max-height: 80vh;
     overflow-y: auto;
+    
 }
 
 /* 故事背景内容 */
@@ -697,6 +698,140 @@ body {
     background: #f8f9fa;
 }
 
+/* 确保编辑模态框在最上层 */
+#editModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 10000; /* 使用非常高的z-index值 */
+}
+
+#editModal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+#editModal .modal-content {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    width: 80%;
+    max-width: 800px;
+    padding: 20px;
+    position: relative;
+    z-index: 10001; /* 确保内容在背景遮罩之上 */
+}
+
+/* 确保其他模态框的z-index较低 */
+#storyTreeModal {
+    z-index: 9000;
+}
+
+.modal:not(#editModal) {
+    z-index: 8000;
+}
+
+/* 剧情树模态框样式 */
+.tree-modal {
+    width: 90%;
+    max-width: 1400px;
+    height: 85vh;
+}
+
+.full-story-tree-container {
+    width: 100%;
+    height: 75%;
+    overflow: auto;
+    border: 1px solid #ddd;
+    background-color: #f8f8f8;
+    margin: 15px 0;
+    position: relative;
+    background-color: #f8f8f8;
+    background-image: linear-gradient(#eee 1px, transparent 1px), 
+                      linear-gradient(90deg, #eee 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -1px -1px;
+}
+
+.full-story-tree {
+    position: relative;
+    padding: 20px;
+    min-height: 500px;
+    min-width: 10000px; /* 确保有足够宽度展示树状结构 */
+    height: 100%;
+}
+
+.tree-node {
+    padding: 10px;
+    background: linear-gradient(to bottom, #ffffff 0%, #f6f6f6 100%);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-node:hover {
+    background: linear-gradient(to bottom, #f0f7ff 0%, #e6f2ff 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.tree-node.selected {
+    border: 2px solid #4a90e2;
+    background: linear-gradient(to bottom, #e6f2ff 0%, #d9eaff 100%);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
+}
+
+.tree-node .node-title {
+    font-weight: bold;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-node .node-content {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* 树连接线样式 */
+.tree-connections-svg {
+    pointer-events: none;
+}
+
+/* 连接模式指示 */
+.connecting-mode .full-story-tree-container {
+    cursor: crosshair;
+}
+
+.connecting-mode .tree-node:hover {
+    border-color: #4a90e2;
+    background-color: #e6f2ff;
+}
+
+
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
     .game-container {
@@ -713,4 +848,244 @@ body {
     .story-tree-panel, .control-panel {
         height: 300px;
     }
+}
+/* 设定模态框样式 */
+.settings-info-content {
+    max-height: 70vh;
+    overflow-y: auto;
+    padding: 10px;
+}
+
+.settings-section {
+    margin-bottom: 25px;
+    border-bottom: 1px solid #eee;
+    padding-bottom: 15px;
+}
+
+.settings-section:last-child {
+    border-bottom: none;
+}
+
+.settings-characters-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 15px;
+}
+
+.settings-character-item {
+    background-color: #f9f9f9;
+    border-radius: 8px;
+    padding: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.settings-character-item h4 {
+    margin-top: 0;
+    color: #333;
+    font-size: 16px;
+    margin-bottom: 8px;
+}
+
+.settings-character-item p {
+    font-size: 14px;
+    color: #666;
+    margin: 0;
+}
+
+/* 复杂度标签样式 */
+.complexity-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    color: white;
+}
+
+.complexity-easy {
+    background-color: #27ae60;
+}
+
+.complexity-medium {
+    background-color: #f39c12;
+}
+
+.complexity-complex {
+    background-color: #e74c3c;
+}
+
+/* 当前路径节点高亮样式 */
+.tree-node.current-path {
+    border: 2px solid #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+    background: linear-gradient(to bottom, #f0ffe0 0%, #e0f8d0 100%);
+}
+
+/* 空树消息样式 */
+.empty-tree-message {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px dashed #ccc;
+    border-radius: 8px;
+    text-align: center;
+    color: #666;
+    max-width: 80%;
+    font-style: italic;
+}
+/* 加载指示器样式 */
+#loadingIndicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+#loadingIndicator.hidden {
+    display: none;
+}
+
+.spinner {
+    border: 4px solid rgba(0, 0, 0, 0.1);
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border-left-color: #4a90e2;
+    animation: spin 1s linear infinite;
+    margin-bottom: 10px;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.choices-container.disabled .choice-btn {
+    opacity: 0.6;
+    pointer-events: none;
+}
+/* 回溯按钮样式 */
+.revert-btn {
+    position: absolute;
+    bottom: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    padding: 3px 8px;
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+    z-index: 5;
+    display: none; /* 默认隐藏，鼠标悬停时显示 */
+}
+
+.tree-node:hover .revert-btn {
+    display: block;
+}
+
+.revert-btn:hover {
+    opacity: 1;
+    background-color: #45a049;
+}
+
+/* 当前路径节点高亮样式 */
+.tree-node.current-path {
+    border: 2px solid #4CAF50;
+    box-shadow: 0 0 8px rgba(76, 175, 80, 0.5);
+    background: linear-gradient(to bottom, #f0ffe0 0%, #e0f8d0 100%);
+}
+
+.tree-node.current-path .revert-btn {
+    background-color: #f39c12;
+}
+
+.tree-node.current-path .revert-btn:hover {
+    background-color: #e67e22;
+}
+
+/* 章节进度条样式 */
+        .chapter-progress-container {
+            margin-bottom: 15px;
+        }
+        
+        .chapter-progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .current-chapter-num {
+            font-weight: bold;
+            color: #4a90e2;
+        }
+        
+        .chapter-progress-text {
+            color: #666;
+        }
+        
+        .total-chapters {
+            color: #666;
+        }
+        
+        .chapter-progress-bar {
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .chapter-progress {
+            height: 100%;
+            background-color: #4a90e2;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* 游戏结束样式 */
+        .game-complete {
+            padding: 20px;
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .game-complete h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        
+        .game-complete p {
+            margin-bottom: 15px;
+        }
+        
+        .restart-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .restart-btn:hover {
+            background-color: #45a049;
+        }
+/* game.css 文件中添加或修改 */
+.story-image-container img {
+    width: 100%;      /* 或指定具体像素，如 400px */
+    max-width: 400px; /* 最大宽度 */
+    height: auto;     /* 保持比例 */
+    display: block;
+    margin: 0 auto;
 }
