@@ -16,6 +16,7 @@
                 <!-- 剧情树节点将通过 JS 动态生成 -->
             </div>
             <div class="tree-controls">
+                <button class="tree-btn view-tree-btn" title="查看完整剧情树"><i class="fas fa-sitemap"></i> 查看剧情树</button>
                 <button class="tree-btn edit-btn" title="编辑标题"><i class="fas fa-edit"></i> 编辑标题</button>
                 <button class="tree-btn back-btn" title="回溯剧情"><i class="fas fa-history"></i> 回溯剧情</button>
             </div>
@@ -138,6 +139,25 @@
             <h2>角色设定</h2>
             <div class="character-grid" id="characterGrid">
                 <!-- 角色卡片将通过 JS 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 剧情树模态框 -->
+    <div class="modal" id="storyTreeModal">
+        <div class="modal-content tree-modal">
+            <span class="close-modal">&times;</span>
+            <h2>完整剧情树</h2>
+            <div class="full-story-tree-container">
+                <div class="full-story-tree" id="fullStoryTree">
+                    <!-- 完整剧情树将通过JS动态生成 -->
+                </div>
+            </div>
+            <!-- 树编辑工具 -->
+            <div class="tree-edit-tools">
+                <button class="tree-tool-btn add-node-btn"><i class="fas fa-plus-circle"></i> 添加节点</button>
+                <button class="tree-tool-btn edit-node-btn"><i class="fas fa-edit"></i> 编辑节点</button>
+                <button class="tree-tool-btn delete-node-btn"><i class="fas fa-trash-alt"></i> 删除节点</button>
             </div>
         </div>
     </div>

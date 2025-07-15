@@ -514,6 +514,7 @@ body {
     max-width: 1000px;
     max-height: 80vh;
     overflow-y: auto;
+    
 }
 
 /* 故事背景内容 */
@@ -696,6 +697,140 @@ body {
 .cancel-modal-btn {
     background: #f8f9fa;
 }
+
+/* 确保编辑模态框在最上层 */
+#editModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.7);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    z-index: 10000; /* 使用非常高的z-index值 */
+}
+
+#editModal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+#editModal .modal-content {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    width: 80%;
+    max-width: 800px;
+    padding: 20px;
+    position: relative;
+    z-index: 10001; /* 确保内容在背景遮罩之上 */
+}
+
+/* 确保其他模态框的z-index较低 */
+#storyTreeModal {
+    z-index: 9000;
+}
+
+.modal:not(#editModal) {
+    z-index: 8000;
+}
+
+/* 剧情树模态框样式 */
+.tree-modal {
+    width: 90%;
+    max-width: 1400px;
+    height: 85vh;
+}
+
+.full-story-tree-container {
+    width: 100%;
+    height: 75%;
+    overflow: auto;
+    border: 1px solid #ddd;
+    background-color: #f8f8f8;
+    margin: 15px 0;
+    position: relative;
+    background-color: #f8f8f8;
+    background-image: linear-gradient(#eee 1px, transparent 1px), 
+                      linear-gradient(90deg, #eee 1px, transparent 1px);
+    background-size: 20px 20px;
+    background-position: -1px -1px;
+}
+
+.full-story-tree {
+    position: relative;
+    padding: 20px;
+    min-height: 500px;
+    min-width: 10000px; /* 确保有足够宽度展示树状结构 */
+    height: 100%;
+}
+
+.tree-node {
+    padding: 10px;
+    background: linear-gradient(to bottom, #ffffff 0%, #f6f6f6 100%);
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    z-index: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-node:hover {
+    background: linear-gradient(to bottom, #f0f7ff 0%, #e6f2ff 100%);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+
+.tree-node.selected {
+    border: 2px solid #4a90e2;
+    background: linear-gradient(to bottom, #e6f2ff 0%, #d9eaff 100%);
+    box-shadow: 0 0 0 3px rgba(74, 144, 226, 0.3);
+}
+
+.tree-node .node-title {
+    font-weight: bold;
+    font-size: 0.9rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tree-node .node-content {
+    font-size: 0.8rem;
+    color: #666;
+    margin-top: 5px;
+    max-height: 40px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+}
+
+/* 树连接线样式 */
+.tree-connections-svg {
+    pointer-events: none;
+}
+
+/* 连接模式指示 */
+.connecting-mode .full-story-tree-container {
+    cursor: crosshair;
+}
+
+.connecting-mode .tree-node:hover {
+    border-color: #4a90e2;
+    background-color: #e6f2ff;
+}
+
+
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
