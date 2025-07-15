@@ -578,7 +578,7 @@ function regenerateImage(description) {
     // 这里应该调用 AI API 来生成图片
     // 现在使用随机占位图片模拟
     const randomSize = Math.floor(Math.random() * 200) + 800;
-    document.getElementById('storyImage').src = `https://via.placeholder.com/${randomSize}x400`;
+    document.getElementById('storyImage').src = `test.png`;
 }
 
 // 初始化编辑功能
@@ -696,7 +696,7 @@ function updateCharacterInfoContent() {
     const characterGrid = document.getElementById('characterGrid');
     characterGrid.innerHTML = gameState.characters.map(char => `
         <div class="character-info-card">
-            <img class="character-info-image" src="https://via.placeholder.com/250x200" alt="${char.name}">
+            <img class="character-info-image" src="test.png" alt="${char.name}">
             <div class="character-info-details">
                 <h3>${char.name}</h3>
                 <p>${char.description}</p>

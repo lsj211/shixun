@@ -1081,3 +1081,11 @@ body {
         .restart-btn:hover {
             background-color: #45a049;
         }
+/* game.css 文件中添加或修改 */
+.story-image-container img {
+    width: 100%;      /* 或指定具体像素，如 400px */
+    max-width: 400px; /* 最大宽度 */
+    height: auto;     /* 保持比例 */
+    display: block;
+    margin: 0 auto;
+}
