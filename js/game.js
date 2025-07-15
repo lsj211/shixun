@@ -16,8 +16,121 @@ const gameState = {
     // 添加已探索节点记录
     exploredNodes: new Set(), // 用于记录已经探索过的节点
     currentPath: [] // 用于记录当前路径上的所有节点
+    
 };
+// 添加更新进度条的函数
+function updateChapterProgress() {
+    // 从游戏设置获取总章节数，默认为5
+    const totalChapters = gameState.settings.chapterCount || 5;
+    
+    // 从当前节点标题提取章节数
+    let currentChapter = 1;
+    if (currentStoryNode && currentStoryNode.title) {
+        const chapterMatch = currentStoryNode.title.match(/第(\d+)章/);
+        if (chapterMatch && chapterMatch[1]) {
+            currentChapter = parseInt(chapterMatch[1]);
+        }
+    }
+    
+    // 确保当前章节不超过总章节数
+    currentChapter = Math.min(currentChapter, totalChapters);
+    
+    // 更新进度条文本
+    const currentChapterElem = document.querySelector('.current-chapter-num');
+    const totalChaptersElem = document.querySelector('.total-chapters');
+    
+    if (currentChapterElem) {
+        currentChapterElem.textContent = `第${currentChapter}章`;
+    }
+    
+    if (totalChaptersElem) {
+        totalChaptersElem.textContent = `共${totalChapters}章`;
+    }
+    
+    // 更新进度条
+    const progressBar = document.getElementById('chapterProgress');
+    if (progressBar) {
+        const progressPercent = (currentChapter / totalChapters) * 100;
+        progressBar.style.width = `${progressPercent}%`;
+        
+        // 检查是否到达最终章节
+        if (currentChapter >= totalChapters) {
+            showGameCompleteMessage();
+        }
+    }
+}
 
+// 显示游戏完成消息
+function showGameCompleteMessage() {
+    // 检查是否已经显示了游戏完成消息
+    if (document.querySelector('.game-complete')) {
+        return;
+    }
+    
+    const gameCompleteDiv = document.createElement('div');
+    gameCompleteDiv.className = 'game-complete';
+    gameCompleteDiv.innerHTML = `
+        <h3>恭喜，你已完成本游戏!</h3>
+        <p>你已经到达了故事的最终章节。你可以继续探索不同的剧情分支，或重新开始游戏。</p>
+        <button class="restart-btn">重新开始</button>
+    `;
+    
+    // 插入到选择按钮之前
+    const choicesContainer = document.querySelector('.choices-container');
+    choicesContainer.parentNode.insertBefore(gameCompleteDiv, choicesContainer);
+    
+    // 禁用生成新节点的功能
+    disableNewBranches();
+    
+    // 添加重新开始按钮的点击事件
+    gameCompleteDiv.querySelector('.restart-btn').addEventListener('click', () => {
+        if (confirm('确定要重新开始游戏吗？当前进度将被重置。')) {
+            resetGame();
+        }
+    });
+}
+
+// 禁用生成新节点的功能
+function disableNewBranches() {
+    // 标记游戏已完成
+    gameState.gameCompleted = true;
+}
+
+// 重置游戏
+function resetGame() {
+    // 重置游戏状态
+    gameState.exploredNodes = new Set();
+    gameState.currentPath = [];
+    gameState.gameCompleted = false;
+    
+    // 恢复初始节点
+    currentStoryNode = storyContent.opening;
+    
+    // 记录初始节点已被探索
+    gameState.exploredNodes.add(currentStoryNode.id);
+    gameState.currentPath.push(currentStoryNode.id);
+    
+    // 更新显示
+    updateStoryDisplay(currentStoryNode);
+    updateChoices(currentStoryNode.choices);
+    updateSidePanelStoryTree();
+    
+    // 移除游戏完成消息
+    const gameCompleteDiv = document.querySelector('.game-complete');
+    if (gameCompleteDiv) {
+        gameCompleteDiv.remove();
+    }
+    
+    // 重置历史记录
+    document.getElementById('storyHistory').innerHTML = '';
+    addToHistory({
+        title: "游戏重置",
+        content: "开始新的游戏"
+    });
+    
+    // 滚动到顶部
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 // 更新示例故事内容库，提供更具体的场景描述和选项
 const storyContent = {
     opening: {
@@ -60,6 +173,9 @@ function initializeGame() {
 
     // 更新侧边栏剧情树
     updateSidePanelStoryTree();
+
+    // 确保进度条初始化
+    updateChapterProgress();
 }
 
 // 更新故事显示
@@ -76,6 +192,9 @@ function updateStoryDisplay(node) {
     
     // 将节点添加到剧情树
     addToStoryTree(node);
+     
+    // 更新进度条
+    updateChapterProgress();
 }
 
 // 修改updateChoices函数，增加防御性检查
@@ -113,16 +232,14 @@ function updateChoices(choices) {
         btn.addEventListener('click', handleChoiceClick);
     });
 }
-// 修改handleChoiceClick函数，添加防御性检查
+// 修改handleChoiceClick函数，考虑游戏完成状态
 function handleChoiceClick(event) {
     const button = event.currentTarget;
     const choiceIndex = parseInt(button.dataset.choiceIndex);
     
-    // 防御性检查：确保currentStoryNode有choices属性且不为空
+    // 防御性检查
     if (!currentStoryNode || !currentStoryNode.choices || currentStoryNode.choices.length === 0) {
         console.error('当前节点没有有效的选择项');
-        
-        // 为避免用户卡住，生成一个新的选择项
         currentStoryNode.choices = generateChoicesForRevertedNode(currentStoryNode);
         updateChoices(currentStoryNode.choices);
         return;
@@ -159,35 +276,44 @@ function handleChoiceClick(event) {
     document.getElementById('loadingIndicator').classList.remove('hidden');
     document.querySelector('.choices-container').classList.add('disabled');
 
-    // 检查是否是回溯后的选择，以及是否需要创建新分支
-    if (gameState.lastRevertedNodeId) {
-        // 查找原有节点信息
+    // 如果游戏已完成，只允许使用已有分支，不创建新分支
+    if (gameState.gameCompleted) {
+        // 查找现有分支
         const parentNode = findNodeInStoryTree(currentStoryNode.id);
         let existingChildForChoice = null;
         
         if (parentNode && parentNode.children) {
-            // 查找与当前选择相匹配的现有分支
             existingChildForChoice = parentNode.children.find(child => {
-                // 假设我们可以通过某种方式将子节点与选择关联起来
-                // 例如，通过比较子节点标题或内容与选择内容的相似度
                 return child.title.includes(currentChoice.text) || 
                        child.content.includes(currentChoice.nextContent);
             });
         }
         
         if (existingChildForChoice) {
-            // 如果找到匹配的分支，直接使用该分支的内容继续故事
+            // 如果找到匹配的分支，使用现有分支
             updateStoryWithExistingNode(existingChildForChoice);
             
             // 隐藏加载状态
             document.getElementById('loadingIndicator').classList.add('hidden');
             document.querySelector('.choices-container').classList.remove('disabled');
             
-            // 清除回溯标记
-            gameState.lastRevertedNodeId = null;
+            // 更新进度条
+            updateChapterProgress();
+            return;
+        } else {
+            // 如果没有找到匹配的分支，显示提示
+            alert('游戏已结束，只能探索现有的剧情分支。');
+            
+            // 隐藏加载状态
+            document.getElementById('loadingIndicator').classList.add('hidden');
+            document.querySelector('.choices-container').classList.remove('disabled');
             return;
         }
-        // 否则将继续执行，创建新的分支
+    }
+
+    // 检查是否是回溯后的选择
+    if (gameState.lastRevertedNodeId) {
+        // 现有的回溯处理代码...
     }
 
     // 生成新的故事内容
@@ -201,9 +327,11 @@ function handleChoiceClick(event) {
         
         // 清除回溯标记
         gameState.lastRevertedNodeId = null;
+        
+        // 更新进度条
+        updateChapterProgress();
     });
     
-    // 打印调试信息
     console.log("选择后已探索节点:", Array.from(gameState.exploredNodes));
 }
 

@@ -36,6 +36,16 @@
                     <h2 id="currentStageTitle">第一章：序章</h2>
                     <button class="edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i></button>
                 </div>
+                <div class="chapter-progress-container">
+                    <div class="chapter-progress-info">
+                        <span class="current-chapter-num">第1章</span>
+                        <span class="chapter-progress-text">游戏进度</span>
+                        <span class="total-chapters">共5章</span>
+                    </div>
+                    <div class="chapter-progress-bar">
+                        <div class="chapter-progress" id="chapterProgress"></div>
+                    </div>
+                </div>
                 <div class="story-image-container">
                     <img id="storyImage" src="https://via.placeholder.com/800x400" alt="场景图片">
                     <button class="regenerate-image-btn" title="重新生成插画"><i class="fas fa-sync-alt"></i></button>
@@ -80,7 +90,6 @@
                 <div class="info-content">
                     <p><strong>背景：</strong><span id="storyBackground"></span></p>
                     <p><strong>当前章节：</strong><span id="currentChapter"></span></p>
-                    <p><strong>已选主题：</strong><span id="selectedTheme"></span></p>
                 </div>
             </div>
             <div class="story-buttons">

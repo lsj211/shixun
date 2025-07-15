@@ -1010,3 +1010,74 @@ body {
 .tree-node.current-path .revert-btn:hover {
     background-color: #e67e22;
 }
+
+/* 章节进度条样式 */
+        .chapter-progress-container {
+            margin-bottom: 15px;
+        }
+        
+        .chapter-progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+        }
+        
+        .current-chapter-num {
+            font-weight: bold;
+            color: #4a90e2;
+        }
+        
+        .chapter-progress-text {
+            color: #666;
+        }
+        
+        .total-chapters {
+            color: #666;
+        }
+        
+        .chapter-progress-bar {
+            height: 8px;
+            background-color: #e0e0e0;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .chapter-progress {
+            height: 100%;
+            background-color: #4a90e2;
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+        
+        /* 游戏结束样式 */
+        .game-complete {
+            padding: 20px;
+            background-color: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4CAF50;
+            border-radius: 8px;
+            margin-top: 20px;
+            text-align: center;
+        }
+        
+        .game-complete h3 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+        }
+        
+        .game-complete p {
+            margin-bottom: 15px;
+        }
+        
+        .restart-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 8px 16px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        .restart-btn:hover {
+            background-color: #45a049;
+        }
