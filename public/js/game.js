@@ -669,6 +669,31 @@ function updateStoryInfoContent() {
     // 更新世界观设定
     document.getElementById('worldBackground').textContent = gameState.storyBackground;
 
+    // 添加AI生成按钮
+    const container = document.querySelector('#storyInfoModal .modal-content');
+    
+    // 检查是否已经添加过按钮
+    if (!container.querySelector('.generate-background-btn')) {
+        const generateButton = document.createElement('button');
+        generateButton.className = 'generate-background-btn';
+        generateButton.innerHTML = '<i class="fas fa-magic"></i> AI生成故事背景';
+        generateButton.style.backgroundColor = '#4CAF50';
+        generateButton.style.color = 'white';
+        generateButton.style.border = 'none';
+        generateButton.style.borderRadius = '4px';
+        generateButton.style.padding = '10px 15px';
+        generateButton.style.margin = '10px 0';
+        generateButton.style.cursor = 'pointer';
+        
+        // 将按钮插入到内容之前
+        container.insertBefore(generateButton, container.firstChild);
+        
+        // 添加按钮点击事件
+        generateButton.addEventListener('click', () => {
+            generateBackgroundContent();
+        });
+    }
+
     // 更新时间线
     const timeline = document.getElementById('storyTimeline');
     timeline.innerHTML = gameState.history.map(event => `
@@ -701,6 +726,32 @@ function updateStoryInfoContent() {
 // 更新角色设定内容
 function updateCharacterInfoContent() {
     const characterGrid = document.getElementById('characterGrid');
+    
+    // 添加AI生成按钮
+    const container = document.querySelector('#characterInfoModal .modal-content');
+    
+    // 检查是否已经添加过按钮
+    if (!container.querySelector('.generate-characters-btn')) {
+        const generateButton = document.createElement('button');
+        generateButton.className = 'generate-characters-btn';
+        generateButton.innerHTML = '<i class="fas fa-magic"></i> AI生成角色详情';
+        generateButton.style.backgroundColor = '#4CAF50';
+        generateButton.style.color = 'white';
+        generateButton.style.border = 'none';
+        generateButton.style.borderRadius = '4px';
+        generateButton.style.padding = '10px 15px';
+        generateButton.style.margin = '10px 0';
+        generateButton.style.cursor = 'pointer';
+        
+        // 将按钮插入到内容之前
+        container.insertBefore(generateButton, container.firstChild);
+        
+        // 添加按钮点击事件
+        generateButton.addEventListener('click', () => {
+            generateCharactersContent();
+        });
+    }
+    
     characterGrid.innerHTML = gameState.characters.map(char => `
         <div class="character-info-card">
             <img class="character-info-image" src="test.png" alt="${char.name}">
@@ -715,10 +766,613 @@ function updateCharacterInfoContent() {
     `).join('');
 }
 
-// 生成角色特征标签
+// 添加生成背景和角色内容的函数
+
+// 生成背景内容
+async function generateBackgroundContent() {
+    const worldBackground = document.getElementById('worldBackground');
+    const timeline = document.getElementById('storyTimeline');
+    const locations = document.getElementById('importantLocations');
+    
+    // 保存原始内容
+    const originalBackground = worldBackground.textContent;
+    const originalTimeline = timeline.innerHTML;
+    const originalLocations = locations.innerHTML;
+    
+    // 创建流式显示容器
+    const streamContainer = document.createElement('div');
+    streamContainer.className = 'stream-container';
+    streamContainer.style.position = 'relative';
+    streamContainer.style.backgroundColor = '#f9f9f9';
+    streamContainer.style.border = '1px solid #ddd';
+    streamContainer.style.borderRadius = '5px';
+    streamContainer.style.padding = '15px';
+    streamContainer.style.margin = '10px 0';
+    streamContainer.style.maxHeight = '300px';
+    streamContainer.style.overflowY = 'auto';
+    
+    // 添加取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消生成';
+    cancelBtn.style.position = 'absolute';
+    cancelBtn.style.right = '10px';
+    cancelBtn.style.top = '10px';
+    cancelBtn.style.backgroundColor = '#ff4d4f';
+    cancelBtn.style.color = 'white';
+    cancelBtn.style.border = 'none';
+    cancelBtn.style.borderRadius = '4px';
+    cancelBtn.style.padding = '5px 10px';
+    cancelBtn.style.cursor = 'pointer';
+    streamContainer.appendChild(cancelBtn);
+    
+    // 添加内容区域
+    const streamContent = document.createElement('div');
+    streamContent.className = 'stream-content';
+    streamContent.textContent = '正在生成世界背景和设定...';
+    streamContainer.appendChild(streamContent);
+    
+    // 替换原始内容区域
+    worldBackground.style.display = 'none';
+    worldBackground.parentNode.insertBefore(streamContainer, worldBackground.nextSibling);
+    
+    // 隐藏其他区域，显示加载中提示
+    const loadingTimeline = document.createElement('div');
+    loadingTimeline.className = 'loading-text';
+    loadingTimeline.textContent = '生成前情提要中...';
+    loadingTimeline.style.padding = '10px';
+    loadingTimeline.style.textAlign = 'center';
+    loadingTimeline.style.color = '#666';
+    
+    const loadingLocations = document.createElement('div');
+    loadingLocations.className = 'loading-text';
+    loadingLocations.textContent = '生成重要地点中...';
+    loadingLocations.style.padding = '10px';
+    loadingLocations.style.textAlign = 'center';
+    loadingLocations.style.color = '#666';
+    
+    timeline.style.display = 'none';
+    locations.style.display = 'none';
+    timeline.parentNode.insertBefore(loadingTimeline, timeline);
+    locations.parentNode.insertBefore(loadingLocations, locations);
+    
+    // 准备请求数据 - 确保使用游戏设定中的背景
+    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    const requestData = {
+        background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
+        complexity: gameSettings.complexity || 'medium',
+        chapterCount: gameSettings.chapterCount || 5,
+        generateComplete: true // 标记需要生成完整设定
+    };
+    
+    // 创建AbortController用于取消请求
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
+    // 取消按钮事件
+    cancelBtn.addEventListener('click', () => {
+        controller.abort();
+        streamContainer.remove();
+        worldBackground.style.display = '';
+        timeline.style.display = '';
+        locations.style.display = '';
+        loadingTimeline.remove();
+        loadingLocations.remove();
+    });
+    
+    try {
+        // 调用API
+        const response = await fetch('/api/generate-background', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData),
+            signal: signal
+        });
+        
+        if (!response.body) {
+            throw new Error('ReadableStream not supported in this browser.');
+        }
+        
+        // 处理流式响应
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
+        
+        // 存储不同部分的生成内容
+        let backgroundContent = '';
+        let timelineEvents = [];
+        let locationsList = [];
+        let currentSection = 'background'; // 初始部分是背景
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            
+            if (done) {
+                break;
+            }
+            
+            // 解码收到的数据
+            const chunk = decoder.decode(value, { stream: true });
+            buffer += chunk;
+            
+            // 处理缓冲区中的完整行
+            const lines = buffer.split('\n');
+            buffer = lines.pop() || '';
+            
+            for (const line of lines) {
+                if (line.trim() === '') continue;
+                
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+                        
+                        // 处理不同部分的标记
+                        if (data.section) {
+                            currentSection = data.section;
+                            continue;
+                        }
+                        
+                        if (data.text) {
+                            // 根据当前处理的部分添加内容
+                            switch (currentSection) {
+                                case 'background':
+                                    backgroundContent += data.text;
+                                    streamContent.textContent = backgroundContent;
+                                    break;
+                                    
+                                case 'timeline':
+                                    // 假设这是一个事件对象或事件描述
+                                    if (typeof data.text === 'string') {
+                                        if (data.text.includes('标题:') || data.text.includes('title:')) {
+                                            // 这是一个新事件的开始
+                                            const titleMatch = data.text.match(/(?:标题:|title:)\s*(.*?)(?:\n|$)/i);
+                                            const contentMatch = data.text.match(/(?:内容:|content:)\s*(.*?)(?:\n|$)/i);
+                                            
+                                            if (titleMatch || contentMatch) {
+                                                timelineEvents.push({
+                                                    title: titleMatch ? titleMatch[1].trim() : '事件',
+                                                    content: contentMatch ? contentMatch[1].trim() : data.text
+                                                });
+                                            }
+                                        } else {
+                                            // 添加到最后一个事件或创建新事件
+                                            if (timelineEvents.length > 0) {
+                                                timelineEvents[timelineEvents.length - 1].content += ' ' + data.text;
+                                            } else {
+                                                timelineEvents.push({
+                                                    title: '事件',
+                                                    content: data.text
+                                                });
+                                            }
+                                        }
+                                    } else if (typeof data.text === 'object') {
+                                        timelineEvents.push(data.text);
+                                    }
+                                    loadingTimeline.textContent = `已生成 ${timelineEvents.length} 个事件...`;
+                                    break;
+                                    
+                                case 'locations':
+                                    // 假设这是一个地点对象或地点描述
+                                    if (typeof data.text === 'string') {
+                                        if (data.text.includes('名称:') || data.text.includes('name:')) {
+                                            // 这是一个新地点的开始
+                                            const nameMatch = data.text.match(/(?:名称:|name:)\s*(.*?)(?:\n|$)/i);
+                                            const descMatch = data.text.match(/(?:描述:|description:)\s*(.*?)(?:\n|$)/i);
+                                            
+                                            if (nameMatch || descMatch) {
+                                                locationsList.push({
+                                                    name: nameMatch ? nameMatch[1].trim() : '地点',
+                                                    description: descMatch ? descMatch[1].trim() : data.text
+                                                });
+                                            }
+                                        } else {
+                                            // 添加到最后一个地点或创建新地点
+                                            if (locationsList.length > 0) {
+                                                locationsList[locationsList.length - 1].description += ' ' + data.text;
+                                            } else {
+                                                locationsList.push({
+                                                    name: '地点',
+                                                    description: data.text
+                                                });
+                                            }
+                                        }
+                                    } else if (typeof data.text === 'object') {
+                                        locationsList.push(data.text);
+                                    }
+                                    loadingLocations.textContent = `已生成 ${locationsList.length} 个地点...`;
+                                    break;
+                            }
+                            
+                            // 自动滚动到底部
+                            streamContainer.scrollTop = streamContainer.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error('解析流数据失败:', e);
+                    }
+                }
+            }
+        }
+        
+        // 显示完整内容
+        worldBackground.textContent = backgroundContent;
+        worldBackground.style.display = '';
+        streamContainer.remove();
+        
+        // 更新游戏状态
+        gameState.storyBackground = backgroundContent;
+        
+        // 提取或生成时间线事件
+        if (timelineEvents.length === 0) {
+            // 如果没有生成时间线事件，尝试从背景中提取关键事件
+            timelineEvents = extractTimelineFromBackground(backgroundContent);
+        }
+        
+        // 提取或生成地点列表
+        if (locationsList.length === 0) {
+            // 如果没有生成地点列表，尝试从背景中提取地点
+            locationsList = extractLocationsFromBackground(backgroundContent);
+        }
+        
+        // 更新时间线和地点
+        timeline.innerHTML = timelineEvents.map(event => `
+            <div class="timeline-event">
+                <h4>${event.title}</h4>
+                <p>${event.content}</p>
+            </div>
+        `).join('');
+        
+        locations.innerHTML = locationsList.map(location => `
+            <div class="location-card">
+                <h4>${location.name}</h4>
+                <p>${location.description}</p>
+            </div>
+        `).join('');
+        
+        // 显示时间线和地点
+        timeline.style.display = '';
+        locations.style.display = '';
+        loadingTimeline.remove();
+        loadingLocations.remove();
+        
+        // 保存生成的内容到游戏状态
+        gameState.timeline = timelineEvents;
+        gameState.locations = locationsList;
+        
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('生成已取消');
+        } else {
+            console.error('生成背景失败:', error);
+            streamContent.textContent = '生成失败，请重试';
+            
+            // 3秒后恢复原始内容
+            setTimeout(() => {
+                worldBackground.style.display = '';
+                streamContainer.remove();
+                timeline.style.display = '';
+                locations.style.display = '';
+                loadingTimeline.remove();
+                loadingLocations.remove();
+            }, 3000);
+        }
+    }
+}
+
+// 从背景文本中提取时间线事件
+function extractTimelineFromBackground(backgroundText) {
+    // 简单实现：按段落分割，选取前5个作为事件
+    const paragraphs = backgroundText.split(/\n\s*\n/);
+    return paragraphs.slice(0, Math.min(5, paragraphs.length)).map((paragraph, index) => {
+        // 尝试从段落中提取标题
+        const firstSentence = paragraph.split(/[.!?。！？]/, 1)[0].trim();
+        const title = firstSentence.length > 30 ? firstSentence.substring(0, 30) + '...' : firstSentence;
+        
+        return {
+            title: `事件 ${index + 1}: ${title}`,
+            content: paragraph
+        };
+    });
+}
+
+// 从背景文本中提取重要地点
+function extractLocationsFromBackground(backgroundText) {
+    // 使用正则表达式识别可能的地点
+    // 地点通常是以大写字母开头的名词，或者后面跟着"城"、"国"、"区"等词汇
+    const locationPatterns = [
+        /([^.!?。！？,，]+(?:城|国|区|省|镇|村|山|河|湖|海|森林|沙漠|岛)[^.!?。！？,，]*)/g,
+        /([A-Z][a-z]+ (?:Castle|Kingdom|City|Town|Village|Mountain|River|Lake|Sea|Forest|Desert|Island))/g,
+        /([A-Z][a-z]+ of [A-Z][a-z]+)/g
+    ];
+    
+    let potentialLocations = [];
+    
+    // 遍历模式，提取潜在地点
+    locationPatterns.forEach(pattern => {
+        const matches = backgroundText.match(pattern);
+        if (matches) {
+            potentialLocations = potentialLocations.concat(matches);
+        }
+    });
+    
+    // 去重
+    potentialLocations = [...new Set(potentialLocations)];
+    
+    // 生成地点列表
+    return potentialLocations.slice(0, Math.min(5, potentialLocations.length)).map(location => {
+        return {
+            name: location,
+            description: `在故事中扮演重要角色的地点，可能与主角的冒险密切相关。`
+        };
+    });
+}
+
+// 生成角色内容
+async function generateCharactersContent() {
+    const characterGrid = document.getElementById('characterGrid');
+    const originalContent = characterGrid.innerHTML;
+    
+    // 创建流式显示容器
+    const streamContainer = document.createElement('div');
+    streamContainer.className = 'stream-container';
+    streamContainer.style.position = 'relative';
+    streamContainer.style.backgroundColor = '#f9f9f9';
+    streamContainer.style.border = '1px solid #ddd';
+    streamContainer.style.borderRadius = '5px';
+    streamContainer.style.padding = '15px';
+    streamContainer.style.margin = '10px 0';
+    streamContainer.style.maxHeight = '300px';
+    streamContainer.style.overflowY = 'auto';
+    
+    // 添加取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消生成';
+    cancelBtn.style.position = 'absolute';
+    cancelBtn.style.right = '10px';
+    cancelBtn.style.top = '10px';
+    cancelBtn.style.backgroundColor = '#ff4d4f';
+    cancelBtn.style.color = 'white';
+    cancelBtn.style.border = 'none';
+    cancelBtn.style.borderRadius = '4px';
+    cancelBtn.style.padding = '5px 10px';
+    cancelBtn.style.cursor = 'pointer';
+    streamContainer.appendChild(cancelBtn);
+    
+    // 添加内容区域
+    const streamContent = document.createElement('div');
+    streamContent.className = 'stream-content';
+    streamContent.textContent = '正在生成角色详情...';
+    streamContainer.appendChild(streamContent);
+    
+    // 替换原始内容区域
+    characterGrid.style.display = 'none';
+    characterGrid.parentNode.insertBefore(streamContainer, characterGrid);
+    
+    // 准备请求数据
+    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    const requestData = {
+        background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
+        complexity: gameSettings.complexity || 'medium',
+        characterCount: gameState.characters.length || 3
+    };
+    
+    // 创建AbortController用于取消请求
+    const controller = new AbortController();
+    const signal = controller.signal;
+    
+    // 取消按钮事件
+    cancelBtn.addEventListener('click', () => {
+        controller.abort();
+        streamContainer.remove();
+        characterGrid.style.display = '';
+    });
+    
+    try {
+        // 调用API获取角色
+        const response = await fetch('/api/generate-characters', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData),
+            signal: signal
+        });
+        
+        // 检查响应类型，是否为SSE流
+        const contentType = response.headers.get('Content-Type');
+        
+        // 处理流式响应
+        if (contentType && contentType.includes('text/event-stream')) {
+            // 是流式响应，需要逐行处理
+            console.log("收到角色生成的SSE流响应");
+            
+            if (!response.body) {
+                throw new Error('浏览器不支持ReadableStream');
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            let completeCharactersData = '';
+            let buffer = '';
+            let characters = [];
+            
+            while (true) {
+                const { done, value } = await reader.read();
+                
+                if (done) {
+                    console.log("SSE流读取完成");
+                    break;
+                }
+                
+                // 解码收到的数据
+                const chunk = decoder.decode(value, { stream: true });
+                buffer += chunk;
+                
+                // 处理缓冲区中的完整行
+                const lines = buffer.split('\n');
+                buffer = lines.pop() || '';
+                
+                for (const line of lines) {
+                    if (line.trim() === '') continue;
+                    
+                    if (line.startsWith('data: ')) {
+                        try {
+                            const eventData = JSON.parse(line.substring(6));
+                            
+                            if (eventData.text) {
+                                completeCharactersData += eventData.text;
+                                streamContent.textContent = '接收角色数据中...\n' + completeCharactersData.substring(0, 200) + '...';
+                            }
+                            
+                            // 如果有角色数据，则提取
+                            if (eventData.characters) {
+                                characters = eventData.characters;
+                            }
+                            
+                            if (eventData.done) {
+                                console.log("收到流结束标记");
+                            }
+                        } catch (parseError) {
+                            console.warn("解析事件数据失败:", parseError, line);
+                        }
+                    }
+                }
+            }
+            
+            // 如果在流中获取到角色数据，直接使用
+            if (characters.length === 0) {
+                // 尝试从完整数据中提取角色
+                try {
+                    const jsonMatch = completeCharactersData.match(/\[\s*\{.*\}\s*\]/s);
+                    if (jsonMatch) {
+                        characters = JSON.parse(jsonMatch[0]);
+                    } else {
+                        throw new Error('无法从流数据中提取角色信息');
+                    }
+                } catch (extractError) {
+                    console.error("提取角色信息失败:", extractError);
+                    throw extractError;
+                }
+            }
+        } else {
+            // 不是流式响应，尝试直接解析JSON
+            if (!response.ok) {
+                throw new Error(`API请求失败: ${response.status}`);
+            }
+            
+            const responseText = await response.text();
+            let data;
+            
+            try {
+                // 尝试处理可能包含"data:"前缀的响应
+                if (responseText.startsWith('data: ')) {
+                    const jsonData = responseText.substring(6);
+                    data = JSON.parse(jsonData);
+                } else {
+                    data = JSON.parse(responseText);
+                }
+            } catch (parseError) {
+                console.error("解析JSON失败:", parseError, responseText);
+                throw parseError;
+            }
+            
+            if (data && data.characters && Array.isArray(data.characters)) {
+                characters = data.characters;
+            } else {
+                throw new Error('API未返回有效的角色数据');
+            }
+        }
+        
+        // 成功获取角色数据
+        if (characters && characters.length > 0) {
+            // 更新游戏状态中的角色
+            gameState.characters = characters.map((char, index) => {
+                // 保留现有角色的图片
+                const existingImage = gameState.characters[index] ? gameState.characters[index].image : null;
+                
+                return {
+                    name: char.name,
+                    description: char.description,
+                    image: existingImage || 'test.png',
+                    traits: extractCharacterTraits(char.description)
+                };
+            });
+            
+            // 更新显示
+            characterGrid.innerHTML = gameState.characters.map(char => `
+                <div class="character-info-card">
+                    <img class="character-info-image" src="${char.image}" alt="${char.name}">
+                    <div class="character-info-details">
+                        <h3>${char.name}</h3>
+                        <p>${char.description}</p>
+                        <div class="character-traits">
+                            ${generateCharacterTraits(char)}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 显示角色网格
+            characterGrid.style.display = '';
+            streamContainer.remove();
+        } else {
+            throw new Error('未收到有效的角色数据');
+        }
+    } catch (error) {
+        if (error.name === 'AbortError') {
+            console.log('生成已取消');
+        } else {
+            console.error('生成角色失败:', error);
+            streamContent.textContent = '生成失败，请重试';
+            
+            // 3秒后恢复原始内容
+            setTimeout(() => {
+                characterGrid.style.display = '';
+                streamContainer.remove();
+            }, 3000);
+        }
+    }
+}
+
+// 从角色描述中提取特征标签
+function extractCharacterTraits(description) {
+    if (!description) return ["未知"];
+    
+    // 常见性格特质词汇
+    const commonTraits = [
+        "勇敢", "聪明", "谨慎", "冒险", "神秘", "忠诚", "叛逆", "乐观", 
+        "悲观", "善良", "冷酷", "固执", "灵活", "敏感", "坚强", "脆弱",
+        "自信", "怀疑", "专注", "粗心", "诚实", "狡猾", "大方", "吝啬",
+        "高傲", "谦卑", "开朗", "内向", "理性", "感性", "领导", "追随"
+    ];
+    
+    // 从描述中提取特质
+    const foundTraits = [];
+    for (const trait of commonTraits) {
+        if (description.includes(trait)) {
+            foundTraits.push(trait);
+        }
+    }
+    
+    // 如果没找到至少3个特质，添加一些通用特质
+    if (foundTraits.length < 3) {
+        const defaultTraits = ["神秘", "复杂", "多面性"];
+        for (const trait of defaultTraits) {
+            if (foundTraits.length < 3 && !foundTraits.includes(trait)) {
+                foundTraits.push(trait);
+            }
+        }
+    }
+    
+    // 最多返回5个特质
+    return foundTraits.slice(0, 5);
+}
+
+// 生成角色特征标签HTML
 function generateCharacterTraits(character) {
-    // 这里应该从角色数据中获取特征
-    const traits = ["神秘", "聪明", "勇敢"]; // 示例特征
+    // 如果角色对象中已有特征，则使用它们
+    const traits = character.traits || extractCharacterTraits(character.description);
+    
     return traits.map(trait => `
         <span class="character-trait">${trait}</span>
     `).join('');
@@ -1719,11 +2373,46 @@ function openNodeEditModal(mode, nodeId) {
     // 设置模态框标题
     modalTitle.textContent = mode === 'add' ? '添加新节点' : '编辑节点';
     
+    // 添加AI生成按钮
+    let aiBtn = editModal.querySelector('.ai-generate-btn');
+    if (!aiBtn) {
+        aiBtn = document.createElement('button');
+        aiBtn.className = 'ai-generate-btn';
+        aiBtn.innerHTML = '<i class="fas fa-magic"></i> AI生成内容';
+        aiBtn.style.marginRight = '10px';
+        aiBtn.style.backgroundColor = '#6200ea';
+        aiBtn.style.color = 'white';
+        aiBtn.style.border = 'none';
+        aiBtn.style.borderRadius = '4px';
+        aiBtn.style.padding = '8px 12px';
+        
+        // 将按钮添加到模态框底部操作区域
+        const modalFooter = editModal.querySelector('.modal-footer') || editModal.querySelector('.modal-actions');
+        if (modalFooter) {
+            modalFooter.insertBefore(aiBtn, saveBtn);
+        }
+    }
+    
+    // 获取父节点内容（如果有的话）
+    let parentNodeContent = null;
+    if (mode === 'add' && nodeId) {
+        // 这是在添加子节点，nodeId是父节点
+        const parentNode = findNodeInStoryTree(nodeId);
+        if (parentNode) {
+            parentNodeContent = parentNode.content;
+        }
+    }
+    
+    // AI生成按钮点击事件
+    aiBtn.onclick = () => {
+        generateNodeContentWithAI(parentNodeContent);
+    };
+    
     // 如果是编辑模式，填充现有内容
     if (mode === 'edit' && nodeId) {
         const node = findNodeInStoryTree(nodeId);
         if (node) {
-            modalInput.value = `标题: ${node.title}\n内容: ${node.content}`;
+            modalInput.value = `标题: ${node.title || ''}\n内容: ${node.content || ''}`;
         }
     } else {
         modalInput.value = '标题: 新节点\n内容: 请输入节点内容...';
@@ -1880,7 +2569,7 @@ function updateSettingsInfoContent() {
     let complexityText = '';
     
     switch(gameSettings.complexity) {
-        case 'easy':
+        case 'simple':
             complexityClass = 'complexity-easy';
             complexityText = '简单';
             break;
@@ -1902,6 +2591,175 @@ function updateSettingsInfoContent() {
     // 显示章节数
     const chapterCountEl = document.getElementById('settingsChapterCount');
     chapterCountEl.textContent = gameSettings.chapterCount || '未指定';
+}
+
+// AI辅助生成节点内容
+async function generateNodeContentWithAI(parentNodeContent = null) {
+    try {
+        // 获取游戏设置
+        let gameSettings;
+        try {
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        } catch (e) {
+            gameSettings = {};
+            console.error('解析游戏设置失败:', e);
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            background: gameSettings.background || '',
+            characters: gameSettings.characters || [],
+            complexity: gameSettings.complexity || 'medium',
+            previousContent: parentNodeContent
+        };
+        
+        // 显示加载状态
+        const modal = document.getElementById('editModal');
+        const modalInput = document.getElementById('modalInput');
+        const originalContent = modalInput.value;
+        
+        // 创建流式显示区域
+        const streamContainer = document.createElement('div');
+        streamContainer.className = 'stream-container';
+        streamContainer.style.position = 'relative';
+        streamContainer.style.maxHeight = '300px';
+        streamContainer.style.overflowY = 'auto';
+        streamContainer.style.border = '1px solid #ccc';
+        streamContainer.style.padding = '10px';
+        streamContainer.style.marginBottom = '15px';
+        streamContainer.style.backgroundColor = '#f9f9f9';
+        streamContainer.style.borderRadius = '5px';
+        streamContainer.style.fontSize = '14px';
+        
+        // 添加取消按钮
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '取消生成';
+        cancelBtn.style.position = 'absolute';
+        cancelBtn.style.right = '10px';
+        cancelBtn.style.top = '10px';
+        cancelBtn.style.backgroundColor = '#ff4d4f';
+        cancelBtn.style.color = 'white';
+        cancelBtn.style.border = 'none';
+        cancelBtn.style.borderRadius = '4px';
+        cancelBtn.style.padding = '5px 10px';
+        streamContainer.appendChild(cancelBtn);
+        
+        // 添加流式内容区域
+        const streamContent = document.createElement('div');
+        streamContent.className = 'stream-content';
+        streamContent.textContent = '正在通过AI生成内容，请稍候...';
+        streamContainer.appendChild(streamContent);
+        
+        // 将流式显示区域添加到模态框中
+        const modalContent = modal.querySelector('.modal-content');
+        modalContent.insertBefore(streamContainer, modalInput);
+        modalInput.style.display = 'none';
+        
+        // 创建EventSource进行流式接收
+        const eventSource = new EventSource(`/api/generate-story-node?timestamp=${Date.now()}`);
+        let generatedText = '';
+        let controller = new AbortController();
+        
+        // 监听取消按钮
+        cancelBtn.addEventListener('click', () => {
+            eventSource.close();
+            streamContainer.remove();
+            modalInput.style.display = 'block';
+            modalInput.value = originalContent;
+            controller.abort();
+        });
+        
+        // 获取生成内容
+        fetch('/api/generate-story-node', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData),
+            signal: controller.signal
+        }).then(response => {
+            if (!response.body) {
+                throw new Error('ReadableStream not supported in this browser.');
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            
+            function readStream() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        streamContainer.remove();
+                        modalInput.style.display = 'block';
+                        
+                        // 从生成的内容中提取标题
+                        const title = extractTitleFromContent(generatedText);
+                        
+                        // 填充到编辑器中
+                        modalInput.value = `标题: ${title}\n内容: ${generatedText}`;
+                        return;
+                    }
+                    
+                    // 处理接收到的数据
+                    const chunkText = decoder.decode(value, { stream: true });
+                    const lines = chunkText.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (!data.done) {
+                                    generatedText += data.text;
+                                    streamContent.textContent = generatedText;
+                                    // 自动滚动到底部
+                                    streamContainer.scrollTop = streamContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('解析流数据失败:', e);
+                            }
+                        }
+                    });
+                    
+                    readStream();
+                }).catch(err => {
+                    if (err.name !== 'AbortError') {
+                        console.error('读取流失败:', err);
+                        streamContent.textContent = '生成内容失败，请重试';
+                    }
+                });
+            }
+            
+            readStream();
+        }).catch(error => {
+            if (error.name !== 'AbortError') {
+                console.error('AI内容生成失败:', error);
+                streamContent.textContent = '生成内容失败，请重试';
+                
+                // 3秒后恢复编辑器
+                setTimeout(() => {
+                    streamContainer.remove();
+                    modalInput.style.display = 'block';
+                    modalInput.value = originalContent;
+                }, 3000);
+            }
+        });
+        
+    } catch (error) {
+        console.error('AI内容生成失败:', error);
+        alert('AI内容生成失败，请稍后重试');
+    }
+}
+
+// 从生成的内容中提取标题
+function extractTitleFromContent(content) {
+    // 尝试从内容的第一句话或第一行提取标题
+    const firstLine = content.split('\n')[0].trim();
+    
+    if (firstLine.length > 30) {
+        // 如果第一行太长，只取前20个字符
+        return firstLine.substring(0, 20) + '...';
+    } else {
+        return firstLine;
+    }
 }
 
 // 修改左侧剧情树面板的渲染函数，只显示当前路径

@@ -1128,3 +1128,55 @@ body {
     display: block;
     margin: 0 auto;
 }
+.stream-container {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 10px 0;
+            position: relative;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .stream-content {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.5;
+            padding-right: 20px;
+        }
+        
+        .generate-background-btn,
+        .generate-characters-btn {
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            padding: 10px 15px;
+            margin: 10px 0;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            font-weight: bold;
+            transition: background-color 0.3s;
+        }
+        
+        .generate-background-btn:hover,
+        .generate-characters-btn:hover {
+            background-color: #45a049;
+        }
+        
+        .generate-background-btn i,
+        .generate-characters-btn i {
+            margin-right: 8px;
+        }
+        
+        .character-trait {
+            display: inline-block;
+            background-color: #e0f2f1;
+            color: #00796b;
+            border-radius: 15px;
+            padding: 3px 10px;
+            margin: 3px;
+            font-size: 0.9em;
+        }

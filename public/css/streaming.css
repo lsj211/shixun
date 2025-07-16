@@ -1,0 +1,107 @@
+/* 流式显示容器样式 */
+.stream-container {
+    position: relative;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin-bottom: 15px;
+    background-color: #f9f9f9;
+    border-radius: 5px;
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.stream-title {
+    font-weight: bold;
+    margin-bottom: 8px;
+    color: #333;
+}
+
+.stream-content {
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+/* 生成过程中的取消按钮 */
+.cancel-generation-btn {
+    position: absolute;
+    right: 10px;
+    top: 10px;
+    background-color: #ff4d4f;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 5px 10px;
+    cursor: pointer;
+    font-size: 12px;
+    z-index: 5;
+}
+
+.cancel-generation-btn:hover {
+    background-color: #ff7875;
+}
+
+/* AI生成按钮样式 */
+.ai-generate-btn {
+    background-color: #6200ea;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    cursor: pointer;
+    margin-right: 10px;
+    display: flex;
+    align-items: center;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+}
+
+.ai-generate-btn i {
+    margin-right: 6px;
+}
+
+.ai-generate-btn:hover {
+    background-color: #7c4dff;
+}
+
+/* 生成中指示器样式 */
+.generating-message, 
+.generating-background {
+    padding: 15px;
+    background-color: #f5f5f5;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin: 10px 0;
+    text-align: center;
+    color: #666;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.generating-message i, 
+.generating-background i {
+    margin-right: 10px;
+    color: #4CAF50;
+    animation: spin 1s infinite linear;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* 角色生成容器样式 */
+.character-stream-container,
+.background-stream-container {
+    background-color: #f9f9f9;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 10px;
+    margin: 10px 0;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 14px;
+    line-height: 1.5;
+}
