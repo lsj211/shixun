@@ -15,8 +15,15 @@ const gameState = {
     },
     // 添加已探索节点记录
     exploredNodes: new Set(), // 用于记录已经探索过的节点
-    currentPath: [] // 用于记录当前路径上的所有节点
+    currentPath: [], // 用于记录当前路径上的所有节点
     
+    // 在 gameState 中添加图片设置
+    imageSettings: {
+        lastDescription: '',
+        lastStyle: 'realistic',
+        lastColorTone: 'warm',
+        lastRequirements: ''
+    }
 };
 // 添加更新进度条的函数
 function updateChapterProgress() {
@@ -2254,7 +2261,107 @@ document.addEventListener('DOMContentLoaded', () => {
     // 将样式添加到文档头部
     document.head.appendChild(style);
 });
-// 在文档加载完成后初始化游戏
+
+// 添加图片生成功能初始化
+function initializeImageGeneration() {
+    const regenerateBtn = document.querySelector('.regenerate-image-btn');
+    const imageModal = document.getElementById('imageGenerateModal');
+    
+    // 重新生成按钮点击事件
+    regenerateBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        
+        // 填充上次的设置
+        document.getElementById('sceneDescription').value = gameState.imageSettings.lastDescription;
+        document.getElementById('artStyle').value = gameState.imageSettings.lastStyle;
+        document.getElementById('colorTone').value = gameState.imageSettings.lastColorTone;
+        document.getElementById('additionalRequirements').value = gameState.imageSettings.lastRequirements;
+        
+        imageModal.classList.add('active');
+    });
+
+    // 生成按钮点击事件
+    document.querySelector('.generate-image-btn').addEventListener('click', async () => {
+        const description = document.getElementById('sceneDescription').value;
+        const style = document.getElementById('artStyle').value;
+        const colorTone = document.getElementById('colorTone').value;
+        const requirements = document.getElementById('additionalRequirements').value;
+        
+        // 保存设置
+        gameState.imageSettings = {
+            lastDescription: description,
+            lastStyle: style,
+            lastColorTone: colorTone,
+            lastRequirements: requirements
+        };
+        
+        // 显示加载状态
+        const imgElement = document.getElementById('storyImage');
+        imgElement.style.opacity = '0.5';
+        
+        try {
+            // 调用AI图片生成API
+            const newImageUrl = await generateImage({
+                description,
+                style,
+                colorTone,
+                requirements
+            });
+            
+            // 更新图片
+            imgElement.src = newImageUrl;
+            imgElement.style.opacity = '1';
+            
+            // 关闭模态框
+            imageModal.classList.remove('active');
+            
+            // 添加到游戏日志
+            addToGameLog({
+                type: 'image',
+                content: `使用${style}风格重新生成了场景插画`
+            });
+            
+        } catch (error) {
+            console.error('生成图片失败:', error);
+            alert('生成图片失败，请稍后重试');
+        }
+    });
+
+    // 关闭按钮事件
+    document.querySelector('.close-modal').addEventListener('click', () => {
+        imageModal.classList.remove('active');
+    });
+
+    // 取消按钮事件
+    document.querySelector('.cancel-modal-btn').addEventListener('click', () => {
+        imageModal.classList.remove('active');
+    });
+}
+
+// 图片生成函数
+async function generateImage(settings) {
+    // 这里应该是实际的AI API调用
+    // 现在用随机占位图片模拟
+    const styles = {
+        realistic: '写实',
+        anime: '动漫',
+        watercolor: '水彩',
+        oil: '油画',
+        pixel: '像素'
+    };
+    
+    console.log('生成图片设置:', settings);
+    
+    // 模拟API调用延迟
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    // 返回随机大小的占位图片
+    const width = Math.floor(Math.random() * 200) + 800;
+    const height = 400;
+    return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
+}
+
+// 在初始化函数中添加图片生成功能的初始化
 document.addEventListener('DOMContentLoaded', () => {
     // 隐藏主题选择区域
     const themeSelection = document.getElementById('themeSelection');
@@ -2275,4 +2382,5 @@ document.addEventListener('DOMContentLoaded', () => {
     initializeStoryInfoButtons();
     initializeStoryTreeFeatures(); // 初始化剧情树功能
     initializeSettingsInfoButton(); // 初始化设定信息按钮
+    initializeImageGeneration();
 });

@@ -830,7 +830,46 @@ body {
     background-color: #e6f2ff;
 }
 
+/* 图片生成模态框样式 */
+.image-generate-form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    margin: 20px 0;
+}
 
+.form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-group label {
+    font-weight: 500;
+    color: #333;
+}
+
+.form-group textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.form-group select {
+    width: 100%;
+    padding: 8px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background: white;
+}
+
+/* 确保图片加载状态的过渡效果 */
+#storyImage {
+    transition: opacity 0.3s ease;
+}
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
