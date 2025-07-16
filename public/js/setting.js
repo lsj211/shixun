@@ -1,4 +1,13 @@
+console.log('Setting page script loaded');
+import { checkAuth, redirectToLogin } from './auth.js';
+console.log('Auth functions imported successfully');
 document.addEventListener('DOMContentLoaded', () => {
+    if (!checkAuth()) {
+        console.log('未找到 token，重定向到登录页');
+        redirectToLogin();
+        return; // 终止后续代码执行
+    }
+    console.log('Token 存在，继续加载设置页面');
     // 获取所有模式按钮元素
     const playModeBtn = document.getElementById('play-mode-btn');
     const createModeBtn = document.getElementById('create-mode-btn');

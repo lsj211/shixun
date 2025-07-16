@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>互动小说 - 游戏</title>
+    <link rel="stylesheet" href="css/game.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="game-container">
+        <!-- 左侧剧情树面板 -->
+        <aside class="story-tree-panel">
+            <h2>剧情树</h2>
+            <div class="story-tree" id="storyTree">
+                <!-- 剧情树节点将通过 JS 动态生成 -->
+            </div>
+            <div class="tree-controls">
+                <button class="tree-btn view-tree-btn" title="查看完整剧情树"><i class="fas fa-sitemap"></i> 查看剧情树</button>
+                
+            </div>
+        </aside>
+
+        <!-- 主要内容区域 -->
+        <main class="story-area">
+            <!-- 角色展示区 -->
+            <div class="characters-showcase">
+                <div class="character-cards" id="characterCards">
+                    <!-- 角色卡片将通过 JS 动态生成 -->
+                </div>
+            </div>
+
+            <!-- 故事内容区 -->
+            <div class="story-content">
+                <div class="stage-title">
+                    <h2 id="currentStageTitle">第一章：序章</h2>
+                    <button class="edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i></button>
+                </div>
+                <div class="chapter-progress-container">
+                    <div class="chapter-progress-info">
+                        <span class="current-chapter-num">第1章</span>
+                        <span class="chapter-progress-text">游戏进度</span>
+                        <span class="total-chapters">共5章</span>
+                    </div>
+                    <div class="chapter-progress-bar">
+                        <div class="chapter-progress" id="chapterProgress"></div>
+                    </div>
+                </div>
+                <div class="story-image-container">
+                    <img id="storyImage" src="test.png" alt="场景图片">
+                    <button class="regenerate-image-btn" title="重新生成插画"><i class="fas fa-sync-alt"></i></button>
+                </div>
+                <div class="story-text-container">
+                    <p id="storyText" class="story-text"></p>
+                    <button class="edit-story-btn" title="编辑剧情"><i class="fas fa-edit"></i></button>
+                </div>
+            </div>
+            
+            <!-- 加载指示器 -->
+            <div id="loadingIndicator" class="hidden">
+                <div class="spinner"></div>
+                <p>正在生成故事内容...</p>
+            </div>
+
+            <!-- 玩家选择区 -->
+            <div class="player-interaction">
+                <div class="choices-container">
+                    <h3>接下来你打算：</h3>
+                    <div class="choices" id="choiceButtons">
+                        <!-- 选择按钮将通过 JS 动态生成 -->
+                    </div>
+                </div>
+                <div class="theme-selection hidden" id="themeSelection">
+                    <h3>选择下一阶段的发展方向：</h3>
+                    <div class="theme-buttons">
+                        <button class="theme-btn" data-theme="emotion">情感互动</button>
+                        <button class="theme-btn" data-theme="mystery">解密探索</button>
+                        <button class="theme-btn" data-theme="action">动作冒险</button>
+                        <button class="theme-btn" data-theme="drama">剧情发展</button>
+                    </div>
+                    <button class="confirm-theme-btn" disabled>确认选择</button>
+                </div>
+            </div>
+        </main>
+
+        <!-- 右侧控制面板 -->
+        <aside class="control-panel">
+            <div class="story-info">
+                <h3>故事信息</h3>
+                <div class="info-content">
+                    <p><strong>背景：</strong><span id="storyBackground"></span></p>
+                    <p><strong>当前章节：</strong><span id="currentChapter"></span></p>
+                </div>
+            </div>
+            <div class="story-buttons">
+                <button class="control-btn story-info-btn"><i class="fas fa-book"></i> 故事背景</button>
+                <button class="control-btn character-info-btn"><i class="fas fa-users"></i> 角色</button>
+                <button class="control-btn settings-info-btn"><i class="fas fa-cogs"></i> 设定</button>
+            </div>
+            <div class="game-controls">
+                <button class="control-btn save-btn"><i class="fas fa-save"></i> 保存进度</button>
+                <button class="control-btn load-btn"><i class="fas fa-folder-open"></i> 读取进度</button>
+                <button class="control-btn settings-btn"><i class="fas fa-cog"></i> 设置</button>
+                <button class="control-btn help-btn"><i class="fas fa-question-circle"></i> 帮助</button>
+            </div>
+            <div class="story-history">
+                <h3>剧情记录</h3>
+                <div class="history-content" id="storyHistory">
+                    <!-- 剧情历史记录将通过 JS 动态更新 -->
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 编辑模态框 -->
+    <div class="modal" id="editModal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="modalTitle">编辑内容</h2>
+            <textarea id="modalInput"></textarea>
+            <div class="modal-buttons">
+                <button class="save-modal-btn">保存</button>
+                <button class="cancel-modal-btn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 故事背景模态框 -->
+    <div class="modal" id="storyInfoModal">
+        <div class="modal-content wide-modal">
+            <span class="close-modal">&times;</span>
+            <h2>故事背景</h2>
+            <div class="story-info-content">
+                <div class="background-section">
+                    <h3>世界观设定</h3>
+                    <p id="worldBackground"></p>
+                </div>
+                <div class="timeline-section">
+                    <h3>前情提要</h3>
+                    <div id="storyTimeline"></div>
+                </div>
+                <div class="location-section">
+                    <h3>重要地点</h3>
+                    <div id="importantLocations"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 角色设定模态框 -->
+    <div class="modal" id="characterInfoModal">
+        <div class="modal-content wide-modal">
+            <span class="close-modal">&times;</span>
+            <h2>角色</h2>
+            <div class="character-grid" id="characterGrid">
+                <!-- 角色卡片将通过 JS 动态生成 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加设定信息模态框 -->
+    <div class="modal" id="settingsInfoModal">
+        <div class="modal-content wide-modal">
+            <span class="close-modal">&times;</span>
+            <h2>游戏设定</h2>
+            <div class="settings-info-content">
+                <div class="settings-section">
+                    <h3>故事背景</h3>
+                    <p id="settingsBackground"></p>
+                </div>
+                <div class="settings-section">
+                    <h3>角色设定</h3>
+                    <div id="settingsCharacters" class="settings-characters-list"></div>
+                </div>
+                <div class="settings-section">
+                    <h3>游戏参数</h3>
+                    <p><strong>复杂度：</strong><span id="settingsComplexity"></span></p>
+                    <p><strong>章节数：</strong><span id="settingsChapterCount"></span></p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- 剧情树模态框 -->
+    <div class="modal" id="storyTreeModal">
+        <div class="modal-content tree-modal">
+            <span class="close-modal">&times;</span>
+            <h2>完整剧情树</h2>
+            <div class="full-story-tree-container">
+                <div class="full-story-tree" id="fullStoryTree">
+                    <!-- 完整剧情树将通过JS动态生成 -->
+                </div>
+            </div>
+            <!-- 树编辑工具 -->
+            <div class="tree-edit-tools">
+                <button class="tree-tool-btn add-node-btn"><i class="fas fa-plus-circle"></i> 添加节点</button>
+                <button class="tree-tool-btn edit-node-btn"><i class="fas fa-edit"></i> 编辑节点</button>
+                <button class="tree-tool-btn delete-node-btn"><i class="fas fa-trash-alt"></i> 删除节点</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 图片生成设置模态框 -->
+    <div class="modal" id="imageGenerateModal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>生成插画设置</h2>
+            <div class="image-generate-form">
+                <div class="form-group">
+                    <label>场景描述</label>
+                    <textarea id="sceneDescription" placeholder="描述你想要的场景，例如：一个阳光明媚的森林小径，周围有繁花似锦..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>艺术风格</label>
+                    <select id="artStyle">
+                        <option value="realistic">写实风格</option>
+                        <option value="anime">动漫风格</option>
+                        <option value="watercolor">水彩画风格</option>
+                        <option value="oil">油画风格</option>
+                        <option value="pixel">像素风格</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>色调倾向</label>
+                    <select id="colorTone">
+                        <option value="warm">温暖色调</option>
+                        <option value="cold">冷色调</option>
+                        <option value="neutral">中性色调</option>
+                        <option value="vibrant">鲜艳色调</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>其他要求</label>
+                    <textarea id="additionalRequirements" placeholder="其他特殊要求，如构图、光影效果等..."></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button class="generate-image-btn">生成插画</button>
+                    <button class="cancel-modal-btn">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+</body>
+</html>
