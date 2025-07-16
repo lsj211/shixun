@@ -199,6 +199,47 @@
         </div>
     </div>
 
+    <!-- 图片生成设置模态框 -->
+    <div class="modal" id="imageGenerateModal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>生成插画设置</h2>
+            <div class="image-generate-form">
+                <div class="form-group">
+                    <label>场景描述</label>
+                    <textarea id="sceneDescription" placeholder="描述你想要的场景，例如：一个阳光明媚的森林小径，周围有繁花似锦..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label>艺术风格</label>
+                    <select id="artStyle">
+                        <option value="realistic">写实风格</option>
+                        <option value="anime">动漫风格</option>
+                        <option value="watercolor">水彩画风格</option>
+                        <option value="oil">油画风格</option>
+                        <option value="pixel">像素风格</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>色调倾向</label>
+                    <select id="colorTone">
+                        <option value="warm">温暖色调</option>
+                        <option value="cold">冷色调</option>
+                        <option value="neutral">中性色调</option>
+                        <option value="vibrant">鲜艳色调</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>其他要求</label>
+                    <textarea id="additionalRequirements" placeholder="其他特殊要求，如构图、光影效果等..."></textarea>
+                </div>
+                <div class="modal-buttons">
+                    <button class="generate-image-btn">生成插画</button>
+                    <button class="cancel-modal-btn">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="js/game.js"></script>
 </body>
 </html>
