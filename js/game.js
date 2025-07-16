@@ -1712,11 +1712,46 @@ function openNodeEditModal(mode, nodeId) {
     // 设置模态框标题
     modalTitle.textContent = mode === 'add' ? '添加新节点' : '编辑节点';
     
+    // 添加AI生成按钮
+    let aiBtn = editModal.querySelector('.ai-generate-btn');
+    if (!aiBtn) {
+        aiBtn = document.createElement('button');
+        aiBtn.className = 'ai-generate-btn';
+        aiBtn.innerHTML = '<i class="fas fa-magic"></i> AI生成内容';
+        aiBtn.style.marginRight = '10px';
+        aiBtn.style.backgroundColor = '#6200ea';
+        aiBtn.style.color = 'white';
+        aiBtn.style.border = 'none';
+        aiBtn.style.borderRadius = '4px';
+        aiBtn.style.padding = '8px 12px';
+        
+        // 将按钮添加到模态框底部操作区域
+        const modalFooter = editModal.querySelector('.modal-footer') || editModal.querySelector('.modal-actions');
+        if (modalFooter) {
+            modalFooter.insertBefore(aiBtn, saveBtn);
+        }
+    }
+    
+    // 获取父节点内容（如果有的话）
+    let parentNodeContent = null;
+    if (mode === 'add' && nodeId) {
+        // 这是在添加子节点，nodeId是父节点
+        const parentNode = findNodeInStoryTree(nodeId);
+        if (parentNode) {
+            parentNodeContent = parentNode.content;
+        }
+    }
+    
+    // AI生成按钮点击事件
+    aiBtn.onclick = () => {
+        generateNodeContentWithAI(parentNodeContent);
+    };
+    
     // 如果是编辑模式，填充现有内容
     if (mode === 'edit' && nodeId) {
         const node = findNodeInStoryTree(nodeId);
         if (node) {
-            modalInput.value = `标题: ${node.title}\n内容: ${node.content}`;
+            modalInput.value = `标题: ${node.title || ''}\n内容: ${node.content || ''}`;
         }
     } else {
         modalInput.value = '标题: 新节点\n内容: 请输入节点内容...';
@@ -1873,7 +1908,7 @@ function updateSettingsInfoContent() {
     let complexityText = '';
     
     switch(gameSettings.complexity) {
-        case 'easy':
+        case 'simple':
             complexityClass = 'complexity-easy';
             complexityText = '简单';
             break;
@@ -1895,6 +1930,175 @@ function updateSettingsInfoContent() {
     // 显示章节数
     const chapterCountEl = document.getElementById('settingsChapterCount');
     chapterCountEl.textContent = gameSettings.chapterCount || '未指定';
+}
+
+// AI辅助生成节点内容
+async function generateNodeContentWithAI(parentNodeContent = null) {
+    try {
+        // 获取游戏设置
+        let gameSettings;
+        try {
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        } catch (e) {
+            gameSettings = {};
+            console.error('解析游戏设置失败:', e);
+        }
+        
+        // 准备请求数据
+        const requestData = {
+            background: gameSettings.background || '',
+            characters: gameSettings.characters || [],
+            complexity: gameSettings.complexity || 'medium',
+            previousContent: parentNodeContent
+        };
+        
+        // 显示加载状态
+        const modal = document.getElementById('editModal');
+        const modalInput = document.getElementById('modalInput');
+        const originalContent = modalInput.value;
+        
+        // 创建流式显示区域
+        const streamContainer = document.createElement('div');
+        streamContainer.className = 'stream-container';
+        streamContainer.style.position = 'relative';
+        streamContainer.style.maxHeight = '300px';
+        streamContainer.style.overflowY = 'auto';
+        streamContainer.style.border = '1px solid #ccc';
+        streamContainer.style.padding = '10px';
+        streamContainer.style.marginBottom = '15px';
+        streamContainer.style.backgroundColor = '#f9f9f9';
+        streamContainer.style.borderRadius = '5px';
+        streamContainer.style.fontSize = '14px';
+        
+        // 添加取消按钮
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '取消生成';
+        cancelBtn.style.position = 'absolute';
+        cancelBtn.style.right = '10px';
+        cancelBtn.style.top = '10px';
+        cancelBtn.style.backgroundColor = '#ff4d4f';
+        cancelBtn.style.color = 'white';
+        cancelBtn.style.border = 'none';
+        cancelBtn.style.borderRadius = '4px';
+        cancelBtn.style.padding = '5px 10px';
+        streamContainer.appendChild(cancelBtn);
+        
+        // 添加流式内容区域
+        const streamContent = document.createElement('div');
+        streamContent.className = 'stream-content';
+        streamContent.textContent = '正在通过AI生成内容，请稍候...';
+        streamContainer.appendChild(streamContent);
+        
+        // 将流式显示区域添加到模态框中
+        const modalContent = modal.querySelector('.modal-content');
+        modalContent.insertBefore(streamContainer, modalInput);
+        modalInput.style.display = 'none';
+        
+        // 创建EventSource进行流式接收
+        const eventSource = new EventSource(`/api/generate-story-node?timestamp=${Date.now()}`);
+        let generatedText = '';
+        let controller = new AbortController();
+        
+        // 监听取消按钮
+        cancelBtn.addEventListener('click', () => {
+            eventSource.close();
+            streamContainer.remove();
+            modalInput.style.display = 'block';
+            modalInput.value = originalContent;
+            controller.abort();
+        });
+        
+        // 获取生成内容
+        fetch('/api/generate-story-node', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData),
+            signal: controller.signal
+        }).then(response => {
+            if (!response.body) {
+                throw new Error('ReadableStream not supported in this browser.');
+            }
+            
+            const reader = response.body.getReader();
+            const decoder = new TextDecoder('utf-8');
+            
+            function readStream() {
+                reader.read().then(({ done, value }) => {
+                    if (done) {
+                        streamContainer.remove();
+                        modalInput.style.display = 'block';
+                        
+                        // 从生成的内容中提取标题
+                        const title = extractTitleFromContent(generatedText);
+                        
+                        // 填充到编辑器中
+                        modalInput.value = `标题: ${title}\n内容: ${generatedText}`;
+                        return;
+                    }
+                    
+                    // 处理接收到的数据
+                    const chunkText = decoder.decode(value, { stream: true });
+                    const lines = chunkText.split('\n');
+                    
+                    lines.forEach(line => {
+                        if (line.startsWith('data: ')) {
+                            try {
+                                const data = JSON.parse(line.substring(6));
+                                if (!data.done) {
+                                    generatedText += data.text;
+                                    streamContent.textContent = generatedText;
+                                    // 自动滚动到底部
+                                    streamContainer.scrollTop = streamContainer.scrollHeight;
+                                }
+                            } catch (e) {
+                                console.error('解析流数据失败:', e);
+                            }
+                        }
+                    });
+                    
+                    readStream();
+                }).catch(err => {
+                    if (err.name !== 'AbortError') {
+                        console.error('读取流失败:', err);
+                        streamContent.textContent = '生成内容失败，请重试';
+                    }
+                });
+            }
+            
+            readStream();
+        }).catch(error => {
+            if (error.name !== 'AbortError') {
+                console.error('AI内容生成失败:', error);
+                streamContent.textContent = '生成内容失败，请重试';
+                
+                // 3秒后恢复编辑器
+                setTimeout(() => {
+                    streamContainer.remove();
+                    modalInput.style.display = 'block';
+                    modalInput.value = originalContent;
+                }, 3000);
+            }
+        });
+        
+    } catch (error) {
+        console.error('AI内容生成失败:', error);
+        alert('AI内容生成失败，请稍后重试');
+    }
+}
+
+// 从生成的内容中提取标题
+function extractTitleFromContent(content) {
+    // 尝试从内容的第一句话或第一行提取标题
+    const firstLine = content.split('\n')[0].trim();
+    
+    if (firstLine.length > 30) {
+        // 如果第一行太长，只取前20个字符
+        return firstLine.substring(0, 20) + '...';
+    } else {
+        return firstLine;
+    }
 }
 
 // 修改左侧剧情树面板的渲染函数，只显示当前路径

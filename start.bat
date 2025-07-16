@@ -1,0 +1,13 @@
+@echo off
+echo 启动互动小说创作系统...
+
+echo 启动Python后端服务...
+start cmd /k "cd /d %~dp0 && python app.py"
+
+echo 等待Python服务启动...
+timeout /t 3 /nobreak > nul
+
+echo 启动Node.js中间层服务...
+start cmd /k "cd /d %~dp0 && node server.js"
+
+echo 服务已启动，请在浏览器中访问 http://localhost:3000

@@ -333,7 +333,7 @@ function regenerateImage(description) {
     // 这里应该调用 AI API 来生成图片
     // 现在使用随机占位图片模拟
     const randomSize = Math.floor(Math.random() * 200) + 800;
-    document.getElementById('storyImage').src = `https://via.placeholder.com/${randomSize}x400`;
+    document.getElementById('storyImage').src = `test.png`;
 }
 
 // 初始化编辑功能
@@ -473,7 +473,7 @@ function updateCharacterInfoContent() {
     
     characterGrid.innerHTML = gameState.characters.map(char => `
         <div class="character-info-card">
-            <img class="character-info-image" src="https://via.placeholder.com/250x200" alt="${char.name}">
+            <img class="character-info-image" src="test.png" alt="${char.name}">
             <div class="character-info-details">
                 <h3>${char.name}</h3>
                 <p>${char.description}</p>
@@ -632,7 +632,7 @@ async function generateImage(settings) {
     // 返回随机大小的占位图片
     const width = Math.floor(Math.random() * 200) + 800;
     const height = 400;
-    return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
+    return `test.png`;
 }
 
 // 在文档加载完成后初始化游戏
