@@ -25,6 +25,27 @@ const gameState = {
         lastRequirements: ''
     }
 };
+
+// 新增：用存档内容覆盖gameState
+(function applyArchiveToGameState() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    if (archiveKey) {
+        try {
+            const gameSettings = JSON.parse(localStorage.getItem(archiveKey));
+            if (gameSettings) {
+                if (gameSettings.background) gameState.storyBackground = gameSettings.background;
+                if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
+                if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
+                if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+            }
+        } catch (e) {
+            console.warn('存档解析失败', e);
+        }
+    }
+})();
+
+
 // 添加更新进度条的函数
 function updateChapterProgress() {
     // 从游戏设置获取总章节数，默认为5
@@ -164,6 +185,7 @@ let currentStoryNode = storyContent.opening;
 
 // 修改初始化游戏函数，确保初始节点被记录
 function initializeGame() {
+    currentStoryNode.content = gameState.storyBackground;
     // 确保初始节点有ID
     if (!currentStoryNode.id) {
         currentStoryNode.id = 'node-1';
@@ -836,7 +858,13 @@ async function generateBackgroundContent() {
     locations.parentNode.insertBefore(loadingLocations, locations);
     
     // 准备请求数据 - 确保使用游戏设定中的背景
-    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    // const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    // 获取当前存档 key
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+
+    // 读取当前存档内容
+    const gameSettings = archiveKey ? JSON.parse(localStorage.getItem(archiveKey)) || {} : {};
     const requestData = {
         background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
         complexity: gameSettings.complexity || 'medium',

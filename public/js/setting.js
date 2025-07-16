@@ -1,4 +1,122 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+
+    // const allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+    // if (allKeys.length > 0) {
+    //     // 创建弹窗
+    //     const modal = document.createElement('div');
+    //     modal.style.position = 'fixed';
+    //     modal.style.top = 0;
+    //     modal.style.left = 0;
+    //     modal.style.width = '100vw';
+    //     modal.style.height = '100vh';
+    //     modal.style.background = 'rgba(0,0,0,0.4)';
+    //     modal.style.display = 'flex';
+    //     modal.style.alignItems = 'center';
+    //     modal.style.justifyContent = 'center';
+    //     modal.style.zIndex = 9999;
+
+    //     const box = document.createElement('div');
+    //     box.style.background = '#fff';
+    //     box.style.padding = '30px 24px';
+    //     box.style.borderRadius = '8px';
+    //     box.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
+    //     box.style.minWidth = '320px';
+    //     box.innerHTML = `
+    //         <h3 style="margin-top:0;">请选择操作</h3>
+    //         <button id="new-archive-btn" style="margin-bottom:16px;width:100%;">新开存档</button>
+    //         <div style="margin:12px 0 8px 0;">或选择以前的设置：</div>
+    //         <select id="archive-select" style="width:100%;margin-bottom:12px;"></select>
+    //         <button id="use-archive-btn" style="width:100%;">使用所选存档</button>
+    //     `;
+    //     modal.appendChild(box);
+    //     document.body.appendChild(modal);
+
+    //     // 填充下拉框
+    //     const select = box.querySelector('#archive-select');
+    //     allKeys.forEach(key => {
+    //         const data = JSON.parse(localStorage.getItem(key) || '{}');
+    //         // 展示存档时间和背景
+    //         const date = new Date(Number(key.replace('gameSettings_', '')));
+    //         const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
+    //         const option = document.createElement('option');
+    //         option.value = key;
+    //         option.textContent = label;
+    //         select.appendChild(option);
+    //     });
+
+    //     // 新开存档
+    //     box.querySelector('#new-archive-btn').onclick = () => {
+    //         document.body.removeChild(modal);
+    //         // 继续后续流程（显示模式选择等）
+    //     };
+
+    //     // 使用旧存档
+    //     box.querySelector('#use-archive-btn').onclick = () => {
+    //         const selectedKey = select.value;
+    //         if (selectedKey) {
+    //             localStorage.setItem('gameSettings_current', selectedKey); // 可选：记录当前存档
+    //             window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
+    //         }
+    //     };
+
+    //     // 阻止后续流程
+    //     return;
+    // }
+
+    // 存档选择区功能
+    const archiveSection = document.getElementById('archive-selection');
+    const archiveSelect = document.getElementById('archive-select');
+    const useArchiveBtn = document.getElementById('use-archive-btn');
+    const newArchiveBtn = document.getElementById('new-archive-btn');
+
+    // 获取所有存档key
+    const allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+
+    // 填充下拉框或显示暂无存档
+    if (allKeys.length > 0) {
+        archiveSection.classList.remove('hidden');
+        archiveSelect.innerHTML = '';
+        allKeys.forEach(key => {
+            const data = JSON.parse(localStorage.getItem(key) || '{}');
+            const date = new Date(Number(key.replace('gameSettings_', '')));
+            const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
+            const option = document.createElement('option');
+            option.value = key;
+            option.textContent = label;
+            archiveSelect.appendChild(option);
+        });
+        useArchiveBtn.disabled = false;
+    } else {
+        archiveSection.classList.remove('hidden');
+        archiveSelect.innerHTML = '';
+        const emptyOption = document.createElement('option');
+        emptyOption.textContent = '暂无存档';
+        emptyOption.disabled = true;
+        emptyOption.selected = true;
+        archiveSelect.appendChild(emptyOption);
+        useArchiveBtn.disabled = true;
+    }
+
+    // 使用所选存档
+    useArchiveBtn.onclick = () => {
+        const selectedKey = archiveSelect.value;
+        if (selectedKey) {
+            localStorage.setItem('gameSettings_current', selectedKey);
+            window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
+        }
+    };
+
+    // 创建新存档
+    newArchiveBtn.onclick = () => {
+        archiveSection.classList.add('hidden');
+        // 显示模式选择区
+        const modeSelection = document.getElementById('mode-selection');
+        if (modeSelection) modeSelection.classList.remove('hidden');
+    };
+
+
+
     // 模式选择按钮
     const playModeBtn = document.getElementById('play-mode-btn');
     const createModeBtn = document.getElementById('create-mode-btn');
@@ -25,7 +143,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chapterCount: 5
     };
     
-    // =================== 模式选择逻辑 ===================
+    // // =================== 模式选择逻辑 ===================
     playModeBtn.addEventListener('click', () => {
         modeSelection.classList.add('hidden');
         playModeSettings.classList.remove('hidden');
@@ -119,14 +237,24 @@ document.addEventListener('DOMContentLoaded', () => {
     startGameBtn.addEventListener('click', () => {
         // 收集所有设置
         collectGameSettings();
-        
-        // 保存设置到localStorage
-        localStorage.setItem('gameSettings', JSON.stringify(gameSettings));
-        
+
+        // 生成唯一key（如用时间戳）
+        const key = 'gameSettings_' + Date.now();
+        localStorage.setItem(key, JSON.stringify(gameSettings));
+
+        // 可选：记录所有key，方便管理
+        let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+        allKeys.push(key);
+        localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+
         // 跳转到游戏页面
         window.location.href = 'game.html';
     });
     
+
+
+
+
     // =================== 辅助函数 ===================
     
     // 添加角色输入框

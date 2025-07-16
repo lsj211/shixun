@@ -15,8 +15,18 @@
             <h1>互动小说创作系统</h1>
         </header>
 
+        <!-- 存档选择区 -->
+        <section id="archive-selection">
+            <div style="font-size:18px;margin-bottom:12px;">选择已有存档：</div>
+            <select id="archive-select" style="width:80%;font-size:15px;padding:6px 8px;margin-bottom:12px;"></select>
+            <div>
+                <button id="use-archive-btn" style="margin-right:12px;padding:8px 18px;">使用所选存档</button>
+                <button id="new-archive-btn" style="padding:8px 18px;">创建新存档</button>
+            </div>
+        </section>
+
         <!-- 模式选择区 -->
-        <section id="mode-selection">
+        <section id="mode-selection" class="hidden">
             <h2>请选择模式</h2>
             <div class="mode-buttons">
                 <button id="play-mode-btn" class="mode-btn">游玩模式</button>
