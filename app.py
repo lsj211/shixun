@@ -165,19 +165,40 @@ async def generate_content_stream(messages, cache_key=None):
 @app.post("/api/generate-background")
 async def generate_background(request: BackgroundGenerationRequest):
     """生成故事背景（流式输出）"""
-    # 创建缓存键
-    cache_key = f"background_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+    # 检查是否有字数限制参数
+    character_limit = getattr(request, 'characterLimit', 200)  # 默认200字
+    format_restrictions = getattr(request, 'formatRestrictions', True)  # 默认启用格式限制
+    world_building_only = getattr(request, 'worldBuildingOnly', True)  # 默认仅生成世界观
     
-    # 构建提示模板
+    # 创建缓存键
+    cache_key = f"background_{request.background[:50]}_{request.complexity}_{request.chapterCount}_limit{character_limit}"
+    
+    # 构建提示模板，增加字数和格式限制
     system_template = (
-        "作为一个专业的互动小说创作者，请基于以下简短描述，扩展创建一个详细的故事背景和世界观设定。\n\n"
-        "请提供：\n"
-        "1. 详细的世界观背景设定（包括时代、地点、社会环境等）\n"
-        "2. 故事主线的概述\n"
-        "3. 可能的冲突和关键事件\n"
-        "4. 这个世界的特殊规则或元素（如果有的话）\n\n"
-        "请以连贯、详细且引人入胜的方式描述，但不要过于冗长。不要使用标题或编号，直接以流畅的段落形式呈现。"
+        "作为一个专业的互动小说创作者，请基于以下简短描述，创建一个故事背景和世界观设定。\n\n"
     )
+    
+    # 根据需求调整系统提示
+    if world_building_only:
+        system_template += (
+            "请仅提供世界观相关内容，不要包含任何故事情节或剧情内容。\n"
+            "世界观应该仅描述故事发生的背景环境、社会结构、规则系统等。\n\n"
+        )
+    
+    # 添加字数限制要求
+    system_template += f"请严格遵守以下字数限制:\n"
+    system_template += f"1. 世界观背景设定: 不超过{character_limit}字\n"
+    system_template += f"2. 前情提要中的每个事件: 不超过{character_limit}字\n"
+    
+    # 添加格式要求
+    if format_restrictions:
+        system_template += (
+            "\n格式要求：\n"
+            "1. 世界观：纯文本段落，不使用标题或编号\n"
+            "2. 前情提要：每个事件格式为\"标题: 事件名称\" + \"内容: 事件描述\"\n"
+            "3. 重要地点：每个地点格式为\"名称: 地点名称\" + \"描述: 地点描述\"\n\n"
+            "请严格遵循以上格式，不要添加其他内容或解释。"
+        )
     
     human_template = (
         f"基础描述: {request.background}\n\n"

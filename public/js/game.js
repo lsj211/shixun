@@ -664,10 +664,23 @@ function initializeStoryInfoButtons() {
     });
 }
 
-// 更新故事背景内容
+// 修改updateStoryInfoContent函数，确保内容保存和恢复
 function updateStoryInfoContent() {
-    // 更新世界观设定
-    document.getElementById('worldBackground').textContent = gameState.storyBackground;
+    // 从gameState或localStorage恢复内容
+    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    
+    // 更新世界观设定 - 优先使用gameState中的内容，若没有则尝试从localStorage恢复
+    const worldBackgroundElement = document.getElementById('worldBackground');
+    let worldBackgroundContent = gameState.storyBackground;
+    
+    // 如果gameState中没有，尝试从localStorage获取
+    if (!worldBackgroundContent && gameSettings.generatedBackground) {
+        worldBackgroundContent = gameSettings.generatedBackground;
+        // 同时更新gameState
+        gameState.storyBackground = worldBackgroundContent;
+    }
+    
+    worldBackgroundElement.textContent = worldBackgroundContent || '点击"AI生成故事背景"按钮生成世界观设定';
 
     // 添加AI生成按钮
     const container = document.querySelector('#storyInfoModal .modal-content');
@@ -694,34 +707,60 @@ function updateStoryInfoContent() {
         });
     }
 
-    // 更新时间线
+    // 更新时间线 - 优先使用gameState中的内容，若没有则尝试从localStorage恢复
     const timeline = document.getElementById('storyTimeline');
-    timeline.innerHTML = gameState.history.map(event => `
-        <div class="timeline-event">
-            <h4>${event.title}</h4>
-            <p>${event.content}</p>
-        </div>
-    `).join('');
+    let timelineEvents = gameState.timeline;
+    
+    // 如果gameState中没有，尝试从localStorage获取
+    if ((!timelineEvents || timelineEvents.length === 0) && gameSettings.generatedTimeline) {
+        timelineEvents = gameSettings.generatedTimeline;
+        // 同时更新gameState
+        gameState.timeline = timelineEvents;
+    }
+    
+    // 如果仍然没有时间线事件，使用历史记录或默认内容
+    if (!timelineEvents || timelineEvents.length === 0) {
+        timeline.innerHTML = gameState.history.length > 0 ? 
+            gameState.history.map(event => `
+                <div class="timeline-event">
+                    <h4>${event.title}</h4>
+                    <p>${event.content}</p>
+                </div>
+            `).join('') : 
+            '<div class="timeline-event"><h4>暂无前情提要</h4><p>生成世界观设定后将显示故事的前情提要</p></div>';
+    } else {
+        timeline.innerHTML = timelineEvents.map(event => `
+            <div class="timeline-event">
+                <h4>${event.title || '事件'}</h4>
+                <p>${event.content || '事件描述'}</p>
+            </div>
+        `).join('');
+    }
 
-    // 更新重要地点
+    // 更新重要地点 - 优先使用gameState中的内容，若没有则尝试从localStorage恢复
     const locations = document.getElementById('importantLocations');
-    // 这里应该从游戏状态中获取地点信息
-    locations.innerHTML = [
-        {
-            name: "神秘房间",
-            description: "故事开始的地方，充满了未解之谜..."
-        },
-        {
-            name: "空旷街道",
-            description: "被雾气笼罩的街道，似乎隐藏着什么..."
-        }
-    ].map(location => `
-        <div class="location-card">
-            <h4>${location.name}</h4>
-            <p>${location.description}</p>
-        </div>
-    `).join('');
+    let locationsList = gameState.locations;
+    
+    // 如果gameState中没有，尝试从localStorage获取
+    if ((!locationsList || locationsList.length === 0) && gameSettings.generatedLocations) {
+        locationsList = gameSettings.generatedLocations;
+        // 同时更新gameState
+        gameState.locations = locationsList;
+    }
+    
+    // 如果仍然没有地点列表，使用默认内容
+    if (!locationsList || locationsList.length === 0) {
+        locations.innerHTML = '<div class="location-card"><h4>暂无重要地点</h4><p>生成世界观设定后将显示故事中的重要地点</p></div>';
+    } else {
+        locations.innerHTML = locationsList.map(location => `
+            <div class="location-card">
+                <h4>${location.name || '地点'}</h4>
+                <p>${location.description || '地点描述'}</p>
+            </div>
+        `).join('');
+    }
 }
+
 
 // 更新角色设定内容
 function updateCharacterInfoContent() {
@@ -768,7 +807,7 @@ function updateCharacterInfoContent() {
 
 // 添加生成背景和角色内容的函数
 
-// 生成背景内容
+// 修改生成背景内容的函数，添加字数限制和格式要求
 async function generateBackgroundContent() {
     const worldBackground = document.getElementById('worldBackground');
     const timeline = document.getElementById('storyTimeline');
@@ -841,7 +880,10 @@ async function generateBackgroundContent() {
         background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
         complexity: gameSettings.complexity || 'medium',
         chapterCount: gameSettings.chapterCount || 5,
-        generateComplete: true // 标记需要生成完整设定
+        generateComplete: true, // 标记需要生成完整设定
+        worldBuildingOnly: true, // 仅生成世界观
+        characterLimit: 200, // 限制世界观和前情提要字数不超过200
+        formatRestrictions: true // 添加格式限制标记
     };
     
     // 创建AbortController用于取消请求
@@ -917,12 +959,18 @@ async function generateBackgroundContent() {
                             // 根据当前处理的部分添加内容
                             switch (currentSection) {
                                 case 'background':
-                                    backgroundContent += data.text;
+                                    // 限制世界观字数不超过200
+                                    if (backgroundContent.length + data.text.length <= 200) {
+                                        backgroundContent += data.text;
+                                    } else if (backgroundContent.length < 200) {
+                                        // 如果添加这段会超过200字，只取到200字
+                                        backgroundContent += data.text.substring(0, 200 - backgroundContent.length);
+                                    }
                                     streamContent.textContent = backgroundContent;
                                     break;
                                     
                                 case 'timeline':
-                                    // 假设这是一个事件对象或事件描述
+                                    // 处理前情提要，每个事件不超过200字
                                     if (typeof data.text === 'string') {
                                         if (data.text.includes('标题:') || data.text.includes('title:')) {
                                             // 这是一个新事件的开始
@@ -932,28 +980,31 @@ async function generateBackgroundContent() {
                                             if (titleMatch || contentMatch) {
                                                 timelineEvents.push({
                                                     title: titleMatch ? titleMatch[1].trim() : '事件',
-                                                    content: contentMatch ? contentMatch[1].trim() : data.text
+                                                    content: contentMatch ? 
+                                                        contentMatch[1].trim().substring(0, 200) : 
+                                                        data.text.substring(0, 200)
                                                 });
+                                            }
+                                        } else if (timelineEvents.length > 0) {
+                                            // 添加到最后一个事件，但确保总长度不超过200
+                                            const lastEvent = timelineEvents[timelineEvents.length - 1];
+                                            if (lastEvent.content.length < 200) {
+                                                const remainingSpace = 200 - lastEvent.content.length;
+                                                lastEvent.content += ' ' + data.text.substring(0, remainingSpace);
                                             }
                                         } else {
-                                            // 添加到最后一个事件或创建新事件
-                                            if (timelineEvents.length > 0) {
-                                                timelineEvents[timelineEvents.length - 1].content += ' ' + data.text;
-                                            } else {
-                                                timelineEvents.push({
-                                                    title: '事件',
-                                                    content: data.text
-                                                });
-                                            }
+                                            // 创建新事件，限制200字
+                                            timelineEvents.push({
+                                                title: '事件',
+                                                content: data.text.substring(0, 200)
+                                            });
                                         }
-                                    } else if (typeof data.text === 'object') {
-                                        timelineEvents.push(data.text);
                                     }
                                     loadingTimeline.textContent = `已生成 ${timelineEvents.length} 个事件...`;
                                     break;
                                     
                                 case 'locations':
-                                    // 假设这是一个地点对象或地点描述
+                                    // 处理地点，确保格式为地点名称+描述
                                     if (typeof data.text === 'string') {
                                         if (data.text.includes('名称:') || data.text.includes('name:')) {
                                             // 这是一个新地点的开始
@@ -963,22 +1014,25 @@ async function generateBackgroundContent() {
                                             if (nameMatch || descMatch) {
                                                 locationsList.push({
                                                     name: nameMatch ? nameMatch[1].trim() : '地点',
-                                                    description: descMatch ? descMatch[1].trim() : data.text
+                                                    description: descMatch ? 
+                                                        descMatch[1].trim().substring(0, 200) : 
+                                                        data.text.substring(0, 200)
                                                 });
+                                            }
+                                        } else if (locationsList.length > 0) {
+                                            // 添加到最后一个地点的描述，但确保总长度合理
+                                            const lastLocation = locationsList[locationsList.length - 1];
+                                            if (lastLocation.description.length < 200) {
+                                                const remainingSpace = 200 - lastLocation.description.length;
+                                                lastLocation.description += ' ' + data.text.substring(0, remainingSpace);
                                             }
                                         } else {
-                                            // 添加到最后一个地点或创建新地点
-                                            if (locationsList.length > 0) {
-                                                locationsList[locationsList.length - 1].description += ' ' + data.text;
-                                            } else {
-                                                locationsList.push({
-                                                    name: '地点',
-                                                    description: data.text
-                                                });
-                                            }
+                                            // 创建新地点
+                                            locationsList.push({
+                                                name: '地点',
+                                                description: data.text.substring(0, 200)
+                                            });
                                         }
-                                    } else if (typeof data.text === 'object') {
-                                        locationsList.push(data.text);
                                     }
                                     loadingLocations.textContent = `已生成 ${locationsList.length} 个地点...`;
                                     break;
@@ -1006,6 +1060,11 @@ async function generateBackgroundContent() {
         if (timelineEvents.length === 0) {
             // 如果没有生成时间线事件，尝试从背景中提取关键事件
             timelineEvents = extractTimelineFromBackground(backgroundContent);
+            // 确保每个事件不超过200字
+            timelineEvents = timelineEvents.map(event => ({
+                title: event.title,
+                content: event.content.substring(0, 200)
+            }));
         }
         
         // 提取或生成地点列表
@@ -1036,8 +1095,20 @@ async function generateBackgroundContent() {
         loadingLocations.remove();
         
         // 保存生成的内容到游戏状态
+        gameState.storyBackground = backgroundContent;
         gameState.timeline = timelineEvents;
         gameState.locations = locationsList;
+        
+        // 另外保存到localStorage，确保关闭后再次打开时能恢复
+        try {
+            const settingsToSave = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            settingsToSave.generatedBackground = backgroundContent;
+            settingsToSave.generatedTimeline = timelineEvents;
+            settingsToSave.generatedLocations = locationsList;
+            localStorage.setItem('gameSettings', JSON.stringify(settingsToSave));
+        } catch (e) {
+            console.error('保存生成内容到localStorage失败:', e);
+        }
         
     } catch (error) {
         if (error.name === 'AbortError') {
@@ -1059,50 +1130,103 @@ async function generateBackgroundContent() {
     }
 }
 
-// 从背景文本中提取时间线事件
+// 修改从背景中提取时间线的函数，改进提取方法
 function extractTimelineFromBackground(backgroundText) {
-    // 简单实现：按段落分割，选取前5个作为事件
-    const paragraphs = backgroundText.split(/\n\s*\n/);
-    return paragraphs.slice(0, Math.min(5, paragraphs.length)).map((paragraph, index) => {
-        // 尝试从段落中提取标题
-        const firstSentence = paragraph.split(/[.!?。！？]/, 1)[0].trim();
-        const title = firstSentence.length > 30 ? firstSentence.substring(0, 30) + '...' : firstSentence;
+    // 尝试找出背景中提到的历史事件或重要节点
+    const timelinePatterns = [
+        /历史上([^。！？]+[。！？])/g,
+        /([^。！？]*重要[^。！？]*事件[^。！？]+[。！？])/g,
+        /([^。！？]*曾经[^。！？]+[。！？])/g,
+        /过去([^。！？]+[。！？])/g
+    ];
+    
+    let extractedEvents = [];
+    
+    // 应用所有模式提取事件
+    timelinePatterns.forEach(pattern => {
+        let matches;
+        while ((matches = pattern.exec(backgroundText)) !== null) {
+            if (matches[1] && matches[1].length > 10) {
+                extractedEvents.push(matches[1].trim());
+            }
+        }
+    });
+    
+    // 如果没有找到足够的事件，使用段落分割方法
+    if (extractedEvents.length < 3) {
+        // 按段落分割，选取前5个作为事件
+        const paragraphs = backgroundText.split(/\n\s*\n/);
+        extractedEvents = paragraphs.slice(0, Math.min(5, paragraphs.length));
+    }
+    
+    // 转换为时间线事件格式
+    return extractedEvents.map((eventText, index) => {
+        // 尝试从事件文本中提取标题
+        const firstSentence = eventText.split(/[.!?。！？]/, 1)[0].trim();
+        const title = firstSentence.length > 30 ? 
+            firstSentence.substring(0, 30) + '...' : 
+            firstSentence || `历史事件 ${index + 1}`;
         
         return {
-            title: `事件 ${index + 1}: ${title}`,
-            content: paragraph
+            title: title,
+            content: eventText
         };
     });
 }
-
-// 从背景文本中提取重要地点
+// 修改从背景中提取地点的函数，改进提取方法
 function extractLocationsFromBackground(backgroundText) {
-    // 使用正则表达式识别可能的地点
-    // 地点通常是以大写字母开头的名词，或者后面跟着"城"、"国"、"区"等词汇
+    // 使用更精确的模式识别地点
     const locationPatterns = [
-        /([^.!?。！？,，]+(?:城|国|区|省|镇|村|山|河|湖|海|森林|沙漠|岛)[^.!?。！？,，]*)/g,
-        /([A-Z][a-z]+ (?:Castle|Kingdom|City|Town|Village|Mountain|River|Lake|Sea|Forest|Desert|Island))/g,
-        /([A-Z][a-z]+ of [A-Z][a-z]+)/g
+        // 明确的地点标记模式
+        /([^。！？，、；：""''（）【】{}]*(?:城市|王国|帝国|城镇|村庄|山脉|河流|湖泊|海洋|森林|沙漠|岛屿|大陆|区域|地区)[^。！？，、；：""''（）【】{}]*)/g,
+        // 专有名词+地点模式
+        /([A-Z][a-z]+\s+(?:City|Kingdom|Empire|Town|Village|Mountain|River|Lake|Ocean|Forest|Desert|Island|Continent|Region))/g,
+        // 地点+"是/位于"模式
+        /([^。！？，、；：""''（）【】{}]+(?:是一个|位于|坐落于)[^。！？，、；：""''（）【】{}]*(?:地方|地点|区域|之地))/g
     ];
     
     let potentialLocations = [];
     
-    // 遍历模式，提取潜在地点
+    // 应用所有模式提取地点
     locationPatterns.forEach(pattern => {
-        const matches = backgroundText.match(pattern);
-        if (matches) {
-            potentialLocations = potentialLocations.concat(matches);
+        let matches;
+        while ((matches = pattern.exec(backgroundText)) !== null) {
+            if (matches[1] && matches[1].length > 3 && matches[1].length < 50) {
+                potentialLocations.push(matches[1].trim());
+            }
         }
     });
     
     // 去重
     potentialLocations = [...new Set(potentialLocations)];
     
-    // 生成地点列表
+    // 如果没有找到足够的地点，尝试识别大写开头的词组作为地点名
+    if (potentialLocations.length < 3) {
+        const properNounPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/g;
+        let matches;
+        while ((matches = properNounPattern.exec(backgroundText)) !== null) {
+            if (matches[1] && !potentialLocations.includes(matches[1]) && matches[1].length > 3) {
+                potentialLocations.push(matches[1]);
+            }
+        }
+    }
+    
+    // 限制地点数量，同时为每个地点生成描述
     return potentialLocations.slice(0, Math.min(5, potentialLocations.length)).map(location => {
+        // 尝试提取包含该地点的句子作为描述
+        let description = '';
+        const sentencePattern = new RegExp(`[^。！？]*${location.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}[^。！？]*[。！？]`, 'g');
+        const sentences = backgroundText.match(sentencePattern);
+        
+        if (sentences && sentences.length > 0) {
+            description = sentences[0].trim();
+        } else {
+            description = `${location}是故事中的一个重要地点。`;
+        }
+        
         return {
             name: location,
-            description: `在故事中扮演重要角色的地点，可能与主角的冒险密切相关。`
+            description: description
         };
     });
 }
