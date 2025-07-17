@@ -25,6 +25,27 @@ const gameState = {
         lastRequirements: ''
     }
 };
+
+// 新增：用存档内容覆盖gameState
+(function applyArchiveToGameState() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    if (archiveKey) {
+        try {
+            const gameSettings = JSON.parse(localStorage.getItem(archiveKey));
+            if (gameSettings) {
+                if (gameSettings.background) gameState.storyBackground = gameSettings.background;
+                if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
+                if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
+                if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+            }
+        } catch (e) {
+            console.warn('存档解析失败', e);
+        }
+    }
+})();
+
+
 // 添加更新进度条的函数
 function updateChapterProgress() {
     // 从游戏设置获取总章节数，默认为5
@@ -164,6 +185,7 @@ let currentStoryNode = storyContent.opening;
 
 // 修改初始化游戏函数，确保初始节点被记录
 function initializeGame() {
+    currentStoryNode.content = gameState.storyBackground;
     // 确保初始节点有ID
     if (!currentStoryNode.id) {
         currentStoryNode.id = 'node-1';
@@ -807,7 +829,7 @@ function updateCharacterInfoContent() {
 
 // 添加生成背景和角色内容的函数
 
-// 修改生成背景内容的函数，添加字数限制和格式要求
+// 修改生成背景内容的函数 - 使用当前存档
 async function generateBackgroundContent() {
     const worldBackground = document.getElementById('worldBackground');
     const timeline = document.getElementById('storyTimeline');
@@ -874,16 +896,34 @@ async function generateBackgroundContent() {
     timeline.parentNode.insertBefore(loadingTimeline, timeline);
     locations.parentNode.insertBefore(loadingLocations, locations);
     
-    // 准备请求数据 - 确保使用游戏设定中的背景
-    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+    // 获取当前存档键
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    
+    // 从当前存档获取游戏设置
+    let gameSettings;
+    try {
+        // 优先使用当前存档中的设定
+        if (archiveKey) {
+            gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
+            console.log('从当前存档加载设定:', archiveKey);
+        } else {
+            // 如果没有当前存档，则使用默认设置
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            console.log('使用默认设定');
+        }
+    } catch (e) {
+        gameSettings = {};
+        console.error('解析游戏设置失败:', e);
+    }
+    
+    // 准备请求数据
     const requestData = {
         background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
         complexity: gameSettings.complexity || 'medium',
         chapterCount: gameSettings.chapterCount || 5,
         generateComplete: true, // 标记需要生成完整设定
-        worldBuildingOnly: true, // 仅生成世界观
-        characterLimit: 200, // 限制世界观和前情提要字数不超过200
-        formatRestrictions: true // 添加格式限制标记
+        worldBuildingOnly: true  // 仅生成世界观
     };
     
     // 创建AbortController用于取消请求
@@ -959,18 +999,13 @@ async function generateBackgroundContent() {
                             // 根据当前处理的部分添加内容
                             switch (currentSection) {
                                 case 'background':
-                                    // 限制世界观字数不超过200
-                                    if (backgroundContent.length + data.text.length <= 200) {
-                                        backgroundContent += data.text;
-                                    } else if (backgroundContent.length < 200) {
-                                        // 如果添加这段会超过200字，只取到200字
-                                        backgroundContent += data.text.substring(0, 200 - backgroundContent.length);
-                                    }
+                                    // 直接添加内容，不限制字数
+                                    backgroundContent += data.text;
                                     streamContent.textContent = backgroundContent;
                                     break;
                                     
                                 case 'timeline':
-                                    // 处理前情提要，每个事件不超过200字
+                                    // 处理前情提要
                                     if (typeof data.text === 'string') {
                                         if (data.text.includes('标题:') || data.text.includes('title:')) {
                                             // 这是一个新事件的开始
@@ -980,23 +1015,17 @@ async function generateBackgroundContent() {
                                             if (titleMatch || contentMatch) {
                                                 timelineEvents.push({
                                                     title: titleMatch ? titleMatch[1].trim() : '事件',
-                                                    content: contentMatch ? 
-                                                        contentMatch[1].trim().substring(0, 200) : 
-                                                        data.text.substring(0, 200)
+                                                    content: contentMatch ? contentMatch[1].trim() : data.text
                                                 });
                                             }
                                         } else if (timelineEvents.length > 0) {
-                                            // 添加到最后一个事件，但确保总长度不超过200
-                                            const lastEvent = timelineEvents[timelineEvents.length - 1];
-                                            if (lastEvent.content.length < 200) {
-                                                const remainingSpace = 200 - lastEvent.content.length;
-                                                lastEvent.content += ' ' + data.text.substring(0, remainingSpace);
-                                            }
+                                            // 添加到最后一个事件
+                                            timelineEvents[timelineEvents.length - 1].content += ' ' + data.text;
                                         } else {
-                                            // 创建新事件，限制200字
+                                            // 创建新事件
                                             timelineEvents.push({
                                                 title: '事件',
-                                                content: data.text.substring(0, 200)
+                                                content: data.text
                                             });
                                         }
                                     }
@@ -1004,7 +1033,7 @@ async function generateBackgroundContent() {
                                     break;
                                     
                                 case 'locations':
-                                    // 处理地点，确保格式为地点名称+描述
+                                    // 处理地点
                                     if (typeof data.text === 'string') {
                                         if (data.text.includes('名称:') || data.text.includes('name:')) {
                                             // 这是一个新地点的开始
@@ -1014,23 +1043,17 @@ async function generateBackgroundContent() {
                                             if (nameMatch || descMatch) {
                                                 locationsList.push({
                                                     name: nameMatch ? nameMatch[1].trim() : '地点',
-                                                    description: descMatch ? 
-                                                        descMatch[1].trim().substring(0, 200) : 
-                                                        data.text.substring(0, 200)
+                                                    description: descMatch ? descMatch[1].trim() : data.text
                                                 });
                                             }
                                         } else if (locationsList.length > 0) {
-                                            // 添加到最后一个地点的描述，但确保总长度合理
-                                            const lastLocation = locationsList[locationsList.length - 1];
-                                            if (lastLocation.description.length < 200) {
-                                                const remainingSpace = 200 - lastLocation.description.length;
-                                                lastLocation.description += ' ' + data.text.substring(0, remainingSpace);
-                                            }
+                                            // 添加到最后一个地点的描述
+                                            locationsList[locationsList.length - 1].description += ' ' + data.text;
                                         } else {
                                             // 创建新地点
                                             locationsList.push({
                                                 name: '地点',
-                                                description: data.text.substring(0, 200)
+                                                description: data.text
                                             });
                                         }
                                     }
@@ -1060,11 +1083,6 @@ async function generateBackgroundContent() {
         if (timelineEvents.length === 0) {
             // 如果没有生成时间线事件，尝试从背景中提取关键事件
             timelineEvents = extractTimelineFromBackground(backgroundContent);
-            // 确保每个事件不超过200字
-            timelineEvents = timelineEvents.map(event => ({
-                title: event.title,
-                content: event.content.substring(0, 200)
-            }));
         }
         
         // 提取或生成地点列表
@@ -1099,15 +1117,31 @@ async function generateBackgroundContent() {
         gameState.timeline = timelineEvents;
         gameState.locations = locationsList;
         
-        // 另外保存到localStorage，确保关闭后再次打开时能恢复
-        try {
-            const settingsToSave = JSON.parse(localStorage.getItem('gameSettings')) || {};
-            settingsToSave.generatedBackground = backgroundContent;
-            settingsToSave.generatedTimeline = timelineEvents;
-            settingsToSave.generatedLocations = locationsList;
-            localStorage.setItem('gameSettings', JSON.stringify(settingsToSave));
-        } catch (e) {
-            console.error('保存生成内容到localStorage失败:', e);
+        // 保存到当前存档，确保关闭后再次打开时能恢复
+        if (archiveKey) {
+            try {
+                const currentArchive = JSON.parse(localStorage.getItem(archiveKey)) || {};
+                currentArchive.background = backgroundContent;
+                currentArchive.generatedBackground = backgroundContent;
+                currentArchive.generatedTimeline = timelineEvents;
+                currentArchive.generatedLocations = locationsList;
+                localStorage.setItem(archiveKey, JSON.stringify(currentArchive));
+                console.log('已将世界观设定保存到当前存档:', archiveKey);
+            } catch (e) {
+                console.error('保存生成内容到存档失败:', e);
+            }
+        } else {
+            // 如果没有当前存档，保存到默认设置
+            try {
+                const settingsToSave = JSON.parse(localStorage.getItem('gameSettings')) || {};
+                settingsToSave.generatedBackground = backgroundContent;
+                settingsToSave.generatedTimeline = timelineEvents;
+                settingsToSave.generatedLocations = locationsList;
+                localStorage.setItem('gameSettings', JSON.stringify(settingsToSave));
+                console.log('已将世界观设定保存到默认设置');
+            } catch (e) {
+                console.error('保存生成内容到localStorage失败:', e);
+            }
         }
         
     } catch (error) {
@@ -1231,7 +1265,7 @@ function extractLocationsFromBackground(backgroundText) {
     });
 }
 
-// 生成角色内容
+// 生成角色内容 - 修改为使用当前存档
 async function generateCharactersContent() {
     const characterGrid = document.getElementById('characterGrid');
     const originalContent = characterGrid.innerHTML;
@@ -1272,8 +1306,28 @@ async function generateCharactersContent() {
     characterGrid.style.display = 'none';
     characterGrid.parentNode.insertBefore(streamContainer, characterGrid);
     
+    // 获取当前存档键
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    
+    // 从当前存档获取游戏设置
+    let gameSettings;
+    try {
+        // 优先使用当前存档中的设定
+        if (archiveKey) {
+            gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
+            console.log('从当前存档加载设定:', archiveKey);
+        } else {
+            // 如果没有当前存档，则使用默认设置
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            console.log('使用默认设定');
+        }
+    } catch (e) {
+        gameSettings = {};
+        console.error('解析游戏设置失败:', e);
+    }
+    
     // 准备请求数据
-    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
     const requestData = {
         background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
         complexity: gameSettings.complexity || 'medium',
@@ -1439,6 +1493,18 @@ async function generateCharactersContent() {
             // 显示角色网格
             characterGrid.style.display = '';
             streamContainer.remove();
+            
+            // 将角色保存到当前存档
+            if (archiveKey) {
+                try {
+                    const currentArchive = JSON.parse(localStorage.getItem(archiveKey)) || {};
+                    currentArchive.characters = gameState.characters;
+                    localStorage.setItem(archiveKey, JSON.stringify(currentArchive));
+                    console.log('已将角色保存到当前存档:', archiveKey);
+                } catch (e) {
+                    console.error('保存角色到存档失败:', e);
+                }
+            }
         } else {
             throw new Error('未收到有效的角色数据');
         }
@@ -1457,6 +1523,7 @@ async function generateCharactersContent() {
         }
     }
 }
+
 
 // 从角色描述中提取特征标签
 function extractCharacterTraits(description) {
@@ -2661,10 +2728,22 @@ function initializeSettingsInfoButton() {
 
 // 更新设定信息内容
 function updateSettingsInfoContent() {
-    // 从本地存储获取游戏设置
+    // 获取当前激活的存档键
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    
+    // 从当前存档获取游戏设置，而不是默认的gameSettings
     let gameSettings;
     try {
-        gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        // 优先使用当前存档中的设定
+        if (archiveKey) {
+            gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
+            console.log('从当前存档加载设定:', archiveKey);
+        } else {
+            // 如果没有当前存档，则使用默认设置
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            console.log('使用默认设定');
+        }
     } catch (e) {
         gameSettings = {};
         console.error('解析游戏设置失败:', e);
@@ -2720,10 +2799,22 @@ function updateSettingsInfoContent() {
 // AI辅助生成节点内容
 async function generateNodeContentWithAI(parentNodeContent = null) {
     try {
-        // 获取游戏设置
+        // 获取当前激活的存档键
+        const urlParams = new URLSearchParams(window.location.search);
+        const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+        
+        // 从当前存档获取游戏设置，而不是默认的gameSettings
         let gameSettings;
         try {
-            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            // 优先使用当前存档中的设定
+            if (archiveKey) {
+                gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
+                console.log('从当前存档加载设定:', archiveKey);
+            } else {
+                // 如果没有当前存档，则使用默认设置
+                gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+                console.log('使用默认设定');
+            }
         } catch (e) {
             gameSettings = {};
             console.error('解析游戏设置失败:', e);
