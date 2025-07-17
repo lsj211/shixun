@@ -541,6 +541,7 @@ function updateStoryWithNewContent(newContent) {
         choices: newContent.choices,
         parentId: parentNodeId  // 重要：记录父节点关系
     };
+    console.log('更新后的当前节点:', currentStoryNode);
 
     // 记录新节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
@@ -3369,6 +3370,7 @@ function saveGameToArchive(archiveKey = null) {
         console.log('已探索节点:', gameState.exploredNodes);
         Array.from(gameState.exploredNodes).forEach(nodeId => {
             const nodeData = findExistingNodeData(nodeId);
+            console.log(nodeData, '节点数据');
             if (nodeData) {
                 // 存储节点的完整数据
                 archiveData.storyNodes[nodeId] = {
