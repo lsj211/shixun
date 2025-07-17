@@ -40,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 archiveSection.classList.remove('hidden');
                 allKeys.forEach(key => {
                     const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    console.log(key)
                     const date = new Date(Number(key.replace(/.*_/, '')));
+                    // console.log(data)
                     const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
                     const option = document.createElement('option');
                     option.value = key;
@@ -659,7 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     backgroundInputs.forEach(input => {
         input.addEventListener('blur', async function() {
             const text = this.value.trim();
-            if (text.length > 10) {
+            if (text.length > 0) {
                 try {
                     const enhancedBackground = await generateEnhancedBackground(text);
                     if (enhancedBackground && confirm('我们生成了更详细的背景描述，是否替换当前内容？')) {
