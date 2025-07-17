@@ -666,94 +666,94 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
     
-    // 生成增强的背景描述
-    async function generateEnhancedBackground(basicBackground) {
-        // 防止重复生成
-        if (isGeneratingBackground) return null;
+    // 生成增强的背景描述 - 简化版，只拓展初始输入
+async function generateEnhancedBackground(basicBackground) {
+    // 防止重复生成
+    if (isGeneratingBackground) return null;
+    
+    try {
+        isGeneratingBackground = true;
         
-        try {
-            isGeneratingBackground = true;
-            
-            // 显示加载指示器
-            const backgroundInput = document.getElementById('play-story-background');
-            const streamContainer = document.createElement('div');
-            streamContainer.className = 'background-stream-container';
-            streamContainer.style.backgroundColor = '#f9f9f9';
-            streamContainer.style.border = '1px solid #ddd';
-            streamContainer.style.borderRadius = '5px';
-            streamContainer.style.padding = '10px';
-            streamContainer.style.margin = '10px 0';
-            streamContainer.style.maxHeight = '300px';
-            streamContainer.style.overflowY = 'auto';
-            streamContainer.innerHTML = '<div class="stream-title">正在生成增强背景：</div><div class="stream-content"></div>';
-            
-            backgroundInput.parentNode.insertBefore(streamContainer, backgroundInput.nextSibling);
-            const streamContent = streamContainer.querySelector('.stream-content');
-            
-            // 流式接收生成的背景
-            const response = await fetch('/api/generate-background', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    background: basicBackground,
-                    complexity: gameSettings.complexity || 'medium',
-                    chapterCount: gameSettings.chapterCount || 5
-                })
-            });
-            
-            if (!response.body) {
-                throw new Error('ReadableStream not supported in this browser.');
-            }
-            
-            const reader = response.body.getReader();
-            const decoder = new TextDecoder('utf-8');
-            let generatedText = '';
-            
-            while (true) {
-                const { done, value } = await reader.read();
-                if (done) break;
-                
-                const chunkText = decoder.decode(value, { stream: true });
-                const lines = chunkText.split('\n');
-                
-                lines.forEach(line => {
-                    if (line.startsWith('data: ')) {
-                        try {
-                            const data = JSON.parse(line.substring(6));
-                            if (!data.done) {
-                                generatedText += data.text;
-                                streamContent.textContent = generatedText;
-                                // 自动滚动到底部
-                                streamContainer.scrollTop = streamContainer.scrollHeight;
-                            }
-                        } catch (e) {
-                            console.error('解析流数据失败:', e);
-                        }
-                    }
-                });
-            }
-            
-            // 移除流式显示容器
-            streamContainer.remove();
-            
-            return generatedText;
-            
-        } catch (error) {
-            console.error('生成增强背景失败:', error);
-            
-            // 移除流式显示容器
-            const streamContainer = document.querySelector('.background-stream-container');
-            if (streamContainer) streamContainer.remove();
-            
-            alert('背景生成失败，请稍后重试');
-            return null;
-            
-        } finally {
-            isGeneratingBackground = false;
+        // 显示加载指示器
+        const backgroundInput = document.getElementById('play-story-background');
+        const streamContainer = document.createElement('div');
+        streamContainer.className = 'background-stream-container';
+        streamContainer.style.backgroundColor = '#f9f9f9';
+        streamContainer.style.border = '1px solid #ddd';
+        streamContainer.style.borderRadius = '5px';
+        streamContainer.style.padding = '10px';
+        streamContainer.style.margin = '10px 0';
+        streamContainer.style.maxHeight = '300px';
+        streamContainer.style.overflowY = 'auto';
+        streamContainer.innerHTML = '<div class="stream-title">正在拓展背景描述：</div><div class="stream-content"></div>';
+        
+        backgroundInput.parentNode.insertBefore(streamContainer, backgroundInput.nextSibling);
+        const streamContent = streamContainer.querySelector('.stream-content');
+        
+        // 修改请求体，添加必要的 chapterCount 参数
+        const response = await fetch('/api/enhance-background', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                background: basicBackground,
+                complexity: gameSettings.complexity || 'medium',
+                chapterCount: gameSettings.chapterCount || 5, // 添加章节数参数
+                enhance_only: true // 标记仅做简单拓展
+            })
+        });
+        if (!response.body) {
+            throw new Error('ReadableStream not supported in this browser.');
         }
+        
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let generatedText = '';
+        
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            
+            const chunkText = decoder.decode(value, { stream: true });
+            const lines = chunkText.split('\n');
+            
+            lines.forEach(line => {
+                if (line.startsWith('data: ')) {
+                    try {
+                        const data = JSON.parse(line.substring(6));
+                        if (!data.done) {
+                            generatedText += data.text;
+                            streamContent.textContent = generatedText;
+                            // 自动滚动到底部
+                            streamContainer.scrollTop = streamContainer.scrollHeight;
+                        }
+                    } catch (e) {
+                        console.error('解析流数据失败:', e);
+                    }
+                }
+            });
+        }
+        
+        // 移除流式显示容器
+        streamContainer.remove();
+        
+        return generatedText;
+        
+    } catch (error) {
+        console.error('生成增强背景失败:', error);
+        
+        // 移除流式显示容器
+        const streamContainer = document.querySelector('.background-stream-container');
+        if (streamContainer) streamContainer.remove();
+        
+        alert('背景拓展失败，请稍后重试');
+        return null;
+        
+    } finally {
+        isGeneratingBackground = false;
     }
+}
 
     // 添加CSS样式
     const style = document.createElement('style');

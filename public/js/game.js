@@ -1072,12 +1072,13 @@ async function generateBackgroundContent() {
         }
         
         // 显示完整内容
-        worldBackground.textContent = backgroundContent;
+        const worldBuildingContent = extractWorldBuilding(backgroundContent);
+        worldBackground.textContent = worldBuildingContent;
         worldBackground.style.display = '';
         streamContainer.remove();
         
         // 更新游戏状态
-        gameState.storyBackground = backgroundContent;
+        gameState.storyBackground = worldBuildingContent;
         
         // 提取或生成时间线事件
         if (timelineEvents.length === 0) {
@@ -1113,7 +1114,7 @@ async function generateBackgroundContent() {
         loadingLocations.remove();
         
         // 保存生成的内容到游戏状态
-        gameState.storyBackground = backgroundContent;
+        gameState.storyBackground = worldBuildingContent;
         gameState.timeline = timelineEvents;
         gameState.locations = locationsList;
         
@@ -1121,7 +1122,7 @@ async function generateBackgroundContent() {
         if (archiveKey) {
             try {
                 const currentArchive = JSON.parse(localStorage.getItem(archiveKey)) || {};
-                currentArchive.background = backgroundContent;
+                currentArchive.background = worldBuildingContent;
                 currentArchive.generatedBackground = backgroundContent;
                 currentArchive.generatedTimeline = timelineEvents;
                 currentArchive.generatedLocations = locationsList;
@@ -1164,105 +1165,127 @@ async function generateBackgroundContent() {
     }
 }
 
-// 修改从背景中提取时间线的函数，改进提取方法
+// 修改从背景中提取时间线的函数，匹配前情提要格式
 function extractTimelineFromBackground(backgroundText) {
-    // 尝试找出背景中提到的历史事件或重要节点
-    const timelinePatterns = [
-        /历史上([^。！？]+[。！？])/g,
-        /([^。！？]*重要[^。！？]*事件[^。！？]+[。！？])/g,
-        /([^。！？]*曾经[^。！？]+[。！？])/g,
-        /过去([^。！？]+[。！？])/g
-    ];
+    // 尝试匹配格式: 前情提要：内容...（直到下一个标题/名称/重要地点）
+    const timelineRegex = /前情提要[:：]\s*(.*?)(?=(?:前情提要[:：]|标题[:：]|名称[:：]|重要地点[:：]|$))/gs;
+    let timelineEvents = [];
+    let match;
     
-    let extractedEvents = [];
-    
-    // 应用所有模式提取事件
-    timelinePatterns.forEach(pattern => {
-        let matches;
-        while ((matches = pattern.exec(backgroundText)) !== null) {
-            if (matches[1] && matches[1].length > 10) {
-                extractedEvents.push(matches[1].trim());
+    // 提取前情提要
+    while ((match = timelineRegex.exec(backgroundText)) !== null) {
+        if (match[1] && match[1].trim()) {
+            // 尝试从提取的内容中找出标题和描述
+            const titleMatch = match[1].match(/标题[:：]\s*(.*?)(?:\n|$)/i);
+            const contentMatch = match[1].match(/(?:内容|描述)[:：]\s*(.*?)(?:\n|$)/is);
+            
+            if (titleMatch && contentMatch) {
+                timelineEvents.push({
+                    title: titleMatch[1].trim(),
+                    content: contentMatch[1].trim()
+                });
+            } else {
+                // 如果没有明确的标题和内容格式，则尝试按句子或段落划分
+                const content = match[1].trim();
+                const sentences = content.split(/[.。!！?？]/);
+                
+                if (sentences.length > 1) {
+                    timelineEvents.push({
+                        title: sentences[0].trim(),
+                        content: content
+                    });
+                } else {
+                    timelineEvents.push({
+                        title: "历史事件",
+                        content: content
+                    });
+                }
             }
         }
-    });
-    
-    // 如果没有找到足够的事件，使用段落分割方法
-    if (extractedEvents.length < 3) {
-        // 按段落分割，选取前5个作为事件
-        const paragraphs = backgroundText.split(/\n\s*\n/);
-        extractedEvents = paragraphs.slice(0, Math.min(5, paragraphs.length));
     }
     
-    // 转换为时间线事件格式
-    return extractedEvents.map((eventText, index) => {
-        // 尝试从事件文本中提取标题
-        const firstSentence = eventText.split(/[.!?。！？]/, 1)[0].trim();
-        const title = firstSentence.length > 30 ? 
-            firstSentence.substring(0, 30) + '...' : 
-            firstSentence || `历史事件 ${index + 1}`;
+    // 尝试匹配标准格式: 标题：xxx 内容：xxx
+    if (timelineEvents.length === 0) {
+        const titleContentRegex = /标题[:：]\s*(.*?)[\s\n]*内容[:：]\s*(.*?)(?=(?:标题[:：]|名称[:：]|重要地点[:：]|$))/gs;
         
-        return {
-            title: title,
-            content: eventText
-        };
-    });
+        while ((match = titleContentRegex.exec(backgroundText)) !== null) {
+            if (match[1] && match[2]) {
+                timelineEvents.push({
+                    title: match[1].trim(),
+                    content: match[2].trim()
+                });
+            }
+        }
+    }
+    
+    return timelineEvents;
 }
-// 修改从背景中提取地点的函数，改进提取方法
+// 提取世界观内容
+function extractWorldBuilding(backgroundText) {
+    // 查找第一个"前情提要："或"标题："出现的位置
+    const timelineIndex = backgroundText.search(/前情提要[：:]/i);
+    const titleIndex = backgroundText.search(/标题[：:]/i);
+    
+    // 确定世界观结束位置
+    let endIndex;
+    if (timelineIndex !== -1 && titleIndex !== -1) {
+        // 如果两者都存在，取较早出现的位置
+        endIndex = Math.min(timelineIndex, titleIndex);
+    } else if (timelineIndex !== -1) {
+        endIndex = timelineIndex;
+    } else if (titleIndex !== -1) {
+        endIndex = titleIndex;
+    } else {
+        // 如果都没找到，将整个文本作为世界观
+        endIndex = backgroundText.length;
+    }
+    
+    // 提取世界观内容
+    if (endIndex > 0) {
+        return backgroundText.substring(4, endIndex).trim();
+    }
+    
+    return backgroundText; // 如果没有找到分隔符，返回整个文本
+}
+
+// 修改从背景中提取地点的函数，匹配重要地点格式
 function extractLocationsFromBackground(backgroundText) {
-    // 使用更精确的模式识别地点
-    const locationPatterns = [
-        // 明确的地点标记模式
-        /([^。！？，、；：""''（）【】{}]*(?:城市|王国|帝国|城镇|村庄|山脉|河流|湖泊|海洋|森林|沙漠|岛屿|大陆|区域|地区)[^。！？，、；：""''（）【】{}]*)/g,
-        // 专有名词+地点模式
-        /([A-Z][a-z]+\s+(?:City|Kingdom|Empire|Town|Village|Mountain|River|Lake|Ocean|Forest|Desert|Island|Continent|Region))/g,
-        // 地点+"是/位于"模式
-        /([^。！？，、；：""''（）【】{}]+(?:是一个|位于|坐落于)[^。！？，、；：""''（）【】{}]*(?:地方|地点|区域|之地))/g
-    ];
+    // 尝试匹配标准格式的重要地点
+    const standardFormatRegex = /重要地点[:：]\s*(.*?)[\s\n]*名称[:：]\s*(.*?)[\s\n]*描述[:：]\s*(.*?)(?=(?:重要地点[:：]|前情提要[:：]|$))/gs;
+    let locationsList = [];
+    let match;
     
-    let potentialLocations = [];
-    
-    // 应用所有模式提取地点
-    locationPatterns.forEach(pattern => {
-        let matches;
-        while ((matches = pattern.exec(backgroundText)) !== null) {
-            if (matches[1] && matches[1].length > 3 && matches[1].length < 50) {
-                potentialLocations.push(matches[1].trim());
-            }
+    // 首先尝试提取标准格式的重要地点
+    while ((match = standardFormatRegex.exec(backgroundText)) !== null) {
+        if (match[2] && match[3]) {
+            locationsList.push({
+                name: match[2].trim(),
+                description: match[3].trim()
+            });
+        } else if (match[1]) {
+            // 如果只匹配到重要地点但没有名称和描述
+            locationsList.push({
+                name: match[1].trim(),
+                description: "详细信息未提供"
+            });
         }
-    });
+    }
     
-    // 去重
-    potentialLocations = [...new Set(potentialLocations)];
-    
-    // 如果没有找到足够的地点，尝试识别大写开头的词组作为地点名
-    if (potentialLocations.length < 3) {
-        const properNounPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)/g;
-        let matches;
-        while ((matches = properNounPattern.exec(backgroundText)) !== null) {
-            if (matches[1] && !potentialLocations.includes(matches[1]) && matches[1].length > 3) {
-                potentialLocations.push(matches[1]);
+    // 如果没有找到标准格式，尝试匹配简化格式（只有名称和描述）
+    if (locationsList.length === 0) {
+        const simplifiedFormatRegex = /名称[:：]\s*(.*?)[\s\n]*描述[:：]\s*(.*?)(?=(?:名称[:：]|前情提要[:：]|$))/gs;
+        
+        while ((match = simplifiedFormatRegex.exec(backgroundText)) !== null) {
+            if (match[1] && match[2]) {
+                locationsList.push({
+                    name: match[1].trim(),
+                    description: match[2].trim()
+                });
             }
         }
     }
     
-    // 限制地点数量，同时为每个地点生成描述
-    return potentialLocations.slice(0, Math.min(5, potentialLocations.length)).map(location => {
-        // 尝试提取包含该地点的句子作为描述
-        let description = '';
-        const sentencePattern = new RegExp(`[^。！？]*${location.replace(/[-[\]{}()*+?.,\\^$|#\s]/g, '\\$&')}[^。！？]*[。！？]`, 'g');
-        const sentences = backgroundText.match(sentencePattern);
-        
-        if (sentences && sentences.length > 0) {
-            description = sentences[0].trim();
-        } else {
-            description = `${location}是故事中的一个重要地点。`;
-        }
-        
-        return {
-            name: location,
-            description: description
-        };
-    });
+    return locationsList;
 }
 
 // 生成角色内容 - 修改为使用当前存档

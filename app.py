@@ -173,15 +173,15 @@ async def generate_background(request: BackgroundGenerationRequest):
         "请严格遵守以下要求：\n"
         "1. 仅提供世界观相关内容，不要包含任何故事情节或剧情内容\n"
         "2. 世界观设定：限制在200字以内，仅描述故事发生的背景环境、社会结构、规则系统等\n"
-        "3. 前情提要：每个事件不超过100字，仅提供故事发生前的关键历史事件\n"
-        "4. 重要地点：每个地点格式为\"名称: 地点名称\" + \"描述: 地点描述\"，描述不超过200字\n\n"
+        "3. 前情提要：每个事件不超过100字，仅提供故事发生前的关键剧情事件\n"
+        "4. 重要地点：每个地点格式为\"重要地点: 地点名称\" + \"描述: 地点描述\"，描述不超过200字\n\n"
         
         "格式要求：\n"
         "1. 世界观：纯文本段落，不使用标题或编号\n"
-        "2. 前情提要：每个事件格式为\"标题: 事件名称\" + \"内容: 事件描述\"\n"
-        "3. 重要地点：每个地点格式为\"名称: 地点名称\" + \"描述: 地点描述\"\n\n"
+        "2. 前情提要：每个事件格式为\"前情提要: 事件名称\" + \"描述: 事件描述\"\n"
+        "3. 重要地点：每个地点格式为\"重要地点: 地点名称\" + \"描述: 地点描述\"\n\n"
         
-        "请严格遵循以上格式，不要添加其他内容或解释，确保内容简洁精炼。"
+        "请严格遵循以上格式，前情提要一定要是前情提要：标题：内容：，重要地点一定要是重要地点：名称：描述：，不要添加其他内容或解释，确保内容简洁精炼。"
     )
     
     human_template = (
@@ -196,6 +196,67 @@ async def generate_background(request: BackgroundGenerationRequest):
         HumanMessage(content=human_template)
     ]
     
+    return StreamingResponse(
+        generate_content_stream(messages, cache_key),
+        media_type="text/event-stream"
+    )
+
+# 在请求模型定义部分添加
+class BackgroundEnhanceRequest(BaseModel):
+    background: str
+    complexity: str = "medium"
+    chapterCount: int = 5
+    enhance_only: bool = True
+
+# 添加这个API端点
+@app.post("/api/enhance-background")
+async def enhance_background(request: BackgroundEnhanceRequest):
+    """简单拓展故事背景（流式输出）- 仅用于设置页面"""
+    # 创建缓存键
+    cache_key = f"enhance_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+    
+    # 检查缓存
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        # 如果有缓存，创建一个模拟流式输出
+        async def stream_cached_content():
+            yield f"data: {json.dumps({'text': cached_content})}\n\n"
+            yield f"data: {json.dumps({'done': True})}\n\n"
+        
+        return StreamingResponse(
+            stream_cached_content(),
+            media_type="text/event-stream"
+        )
+    
+    # 构建提示模板 - 简化版，仅用于背景拓展
+    system_template = (
+        "你是一位富有创造力的互动小说背景设计师。请基于用户提供的简短描述，拓展并丰富这个故事背景。\n\n"
+        "要求：\n"
+        "1. 生成一段200-300字的连贯段落，不要分段\n"
+        "2. 只拓展背景设定，不要创建具体角色或情节\n"
+        "3. 保留用户原始描述的核心要素和风格\n"
+        "4. 不要使用标题、序号或分类\n"
+        "5. 不要超出一个段落\n"
+        "6. 不要添加前情提要或地点描述\n"
+        f"7. 故事复杂度应为{request.complexity}级别\n"
+        f"8. 故事应该设计为适合{request.chapterCount}章节的长度\n\n"
+        
+        "重要：直接输出拓展后的背景描述，不要添加任何前缀、注释或解释。"
+    )
+    
+    human_template = (
+        f"原始背景描述: {request.background}\n\n"
+        f"复杂度: {request.complexity} (简单/中等/复杂)\n"
+        f"计划章节数: {request.chapterCount}章\n\n"
+        f"请将这个简短描述拓展为一个更丰富、更具体的世界背景描述，适合{request.complexity}复杂度和{request.chapterCount}章节的故事。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    # 使用通用的流式生成函数
     return StreamingResponse(
         generate_content_stream(messages, cache_key),
         media_type="text/event-stream"
