@@ -649,7 +649,7 @@ document.addEventListener('DOMContentLoaded', () => {
     backgroundInputs.forEach(input => {
         input.addEventListener('blur', async function() {
             const text = this.value.trim();
-            if (text.length > 10) {
+            if (text.length > 0) {
                 try {
                     const enhancedBackground = await generateEnhancedBackground(text);
                     if (enhancedBackground && confirm('我们生成了更详细的背景描述，是否替换当前内容？')) {

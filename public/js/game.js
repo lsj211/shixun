@@ -191,6 +191,9 @@ function initializeGame() {
         currentStoryNode.id = 'node-1';
     }
     
+    // 缓存初始节点 - 新增这一行
+    cacheNodeData(currentStoryNode);
+
     // 记录初始节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
     gameState.currentPath.push(currentStoryNode.id);
@@ -347,6 +350,10 @@ function handleChoiceClick(event) {
 
     // 生成新的故事内容
     generateNextContent(currentChoice).then(newContent => {
+        // 增加章节和场景信息
+        newContent.chapter = calculateNextChapter(currentStoryNode);
+        newContent.scene = calculateNextScene(currentStoryNode);
+        
         // 更新故事显示
         updateStoryWithNewContent(newContent);
         
@@ -362,6 +369,26 @@ function handleChoiceClick(event) {
     });
     
     console.log("选择后已探索节点:", Array.from(gameState.exploredNodes));
+}
+
+// 计算下一章节
+function calculateNextChapter(currentNode) {
+    // 根据游戏逻辑判断是否要进入下一章
+    // 这里简单实现：如果当前场景是3或更高，则进入下一章
+    if (!currentNode.chapter) return 1;
+    if (currentNode.scene >= 3) {
+        return currentNode.chapter + 1;
+    }
+    return currentNode.chapter;
+}
+
+// 计算下一场景
+function calculateNextScene(currentNode) {
+    if (!currentNode.scene) return 1;
+    if (currentNode.scene >= 3) {
+        return 1; // 新章节，场景重置为1
+    }
+    return currentNode.scene + 1; // 同章节，场景+1
 }
 
 // 添加使用现有节点更新故事的函数
@@ -541,7 +568,9 @@ function updateStoryWithNewContent(newContent) {
         choices: newContent.choices,
         parentId: parentNodeId  // 重要：记录父节点关系
     };
-    console.log('更新后的当前节点:', currentStoryNode);
+
+    // 缓存新节点数据 - 新增这一行
+    cacheNodeData(currentStoryNode);
 
     // 记录新节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
@@ -1769,17 +1798,45 @@ function highlightCurrentPath() {
     });
 }
 
-// 在游戏状态和临时树中查找节点数据
+// 修复的 findExistingNodeData 函数
 function findExistingNodeData(nodeId) {
-    // 首先在游戏状态中查找
+    // 首先检查当前节点
+    if (currentStoryNode && currentStoryNode.id === nodeId) {
+        return currentStoryNode;
+    }
+    
+    // 在游戏状态中查找
     if (gameState.storyTree && gameState.storyTree.length > 0) {
         const result = findNodeInTree(gameState.storyTree, nodeId);
         if (result) return result;
     }
     
-    // 然后在临时树中查找
-    const tempTree = buildTempStoryTree();
-    return findNodeInTree(tempTree, nodeId);
+    // 遍历本地保存的所有已知节点
+    const knownNodes = window._gameNodeCache || {};
+    if (knownNodes[nodeId]) {
+        return knownNodes[nodeId];
+    }
+    
+    // 最后尝试在初始内容中查找
+    if (storyContent.opening.id === nodeId) {
+        return storyContent.opening;
+    }
+    
+    // 实在找不到，则返回null
+    return null;
+}
+
+// 在生成新节点或加载节点时，确保将其缓存
+function cacheNodeData(node) {
+    if (!node || !node.id) return;
+    
+    // 确保缓存存在
+    if (!window._gameNodeCache) {
+        window._gameNodeCache = {};
+    }
+    
+    // 将节点添加到缓存
+    window._gameNodeCache[node.id] = { ...node };
 }
 
 // 在树中递归查找节点
@@ -3105,6 +3162,9 @@ async function startGame() {
             scene: 1
         };
         
+        // 缓存初始节点 - 新增这一行
+        cacheNodeData(currentStoryNode);
+
         // 记录节点已被探索
         gameState.exploredNodes.add(currentStoryNode.id);
         gameState.currentPath.push(currentStoryNode.id);
@@ -3367,21 +3427,40 @@ function saveGameToArchive(archiveKey = null) {
     console.log('存档数据:', archiveData);
     // 收集所有已探索节点的完整数据
     if (gameState.exploredNodes && gameState.exploredNodes.size > 0) {
-        console.log('已探索节点:', gameState.exploredNodes);
+        console.log('已探索节点:', Array.from(gameState.exploredNodes));
+        
+        // 获取节点缓存
+        const nodeCache = window._gameNodeCache || {};
+        
         Array.from(gameState.exploredNodes).forEach(nodeId => {
-            const nodeData = findExistingNodeData(nodeId);
-            console.log(nodeData, '节点数据');
+            // 首先检查当前节点
+            let nodeData = null;
+            
+            if (currentStoryNode && currentStoryNode.id === nodeId) {
+                nodeData = currentStoryNode;
+            }
+            // 然后检查缓存
+            else if (nodeCache[nodeId]) {
+                nodeData = nodeCache[nodeId];
+            }
+            // 最后尝试使用findExistingNodeData
+            else {
+                nodeData = findExistingNodeData(nodeId);
+            }
+            
             if (nodeData) {
                 // 存储节点的完整数据
                 archiveData.storyNodes[nodeId] = {
                     id: nodeData.id,
                     title: nodeData.title,
                     content: nodeData.content,
-                    choices: nodeData.choices,
+                    choices: nodeData.choices || [],
                     parentId: nodeData.parentId,
-                    chapter: nodeData.chapter,
-                    scene: nodeData.scene
+                    chapter: nodeData.chapter || 1,
+                    scene: nodeData.scene || 1
                 };
+            } else {
+                console.warn('无法找到节点数据:', nodeId);
             }
         });
     }
@@ -3501,7 +3580,7 @@ function saveGameInChunks(archiveKey, archiveData) {
 }
 
 
-// 从存档加载游戏状态
+// 修改从存档加载游戏状态函数
 function loadGameFromArchive(archiveKey) {
     try {
         // 获取存档数据
@@ -3545,23 +3624,21 @@ function loadGameFromArchive(archiveKey) {
             // 重建故事树
             gameState.storyTree = buildStoryTreeFromNodes(archiveData.storyNodes || {});
             
-            // 恢复当前节点
-            const currentNodeId = archiveData.gameProgress.currentNodeId;
-            console.log(archiveData)
-            console.log('当前节点ID:', currentNodeId);
-            console.log('故事节点数据:', archiveData.storyNodes);
-            if (currentNodeId && archiveData.storyNodes && archiveData.storyNodes[currentNodeId]) {
-                currentStoryNode = archiveData.storyNodes[currentNodeId];
-            } else {
-                console.warn('无法恢复当前节点，使用初始节点');
-                currentStoryNode = storyContent.opening;
+            // 更新节点缓存
+            if (archiveData.storyNodes) {
+                window._gameNodeCache = window._gameNodeCache || {};
+                Object.keys(archiveData.storyNodes).forEach(nodeId => {
+                    window._gameNodeCache[nodeId] = { ...archiveData.storyNodes[nodeId] };
+                });
             }
+            
+            // 注意：不在这里设置currentStoryNode，而在loadSavedGame中处理
         }
         
         // 设置为当前存档
         localStorage.setItem('gameSettings_current', archiveKey);
         
-        console.log('游戏已从存档加载:', archiveKey);
+        console.log('游戏数据已从存档加载:', archiveKey);
         return true;
     } catch (error) {
         console.error('加载存档失败:', error);
@@ -3569,7 +3646,7 @@ function loadGameFromArchive(archiveKey) {
     }
 }
 
-// 从分块存档加载游戏
+// 修改从分块存档加载游戏函数
 function loadGameFromChunks(archiveKey, indexData) {
     try {
         if (!indexData.chunks || !indexData.baseKey) {
@@ -3610,40 +3687,41 @@ function loadGameFromChunks(archiveKey, indexData) {
         
         // 4. 加载游戏进度
         const chunk4 = JSON.parse(localStorage.getItem(indexData.chunks[3]));
-        let currentNodeId = null;
         if (chunk4 && chunk4.gameProgress) {
             gameState.exploredNodes = new Set(chunk4.gameProgress.exploredNodes || []);
             gameState.currentPath = chunk4.gameProgress.currentPath || [];
             gameState.history = chunk4.gameProgress.history || [];
-            currentNodeId = chunk4.gameProgress.currentNodeId;
         }
         
-        // 5. 加载故事节点数据
+        // 5. 加载故事节点数据，但不设置当前节点
         const storyNodes = {};
         // 从第5块开始都是节点数据
         for (let i = 4; i < indexData.chunks.length; i++) {
-            const nodeChunk = JSON.parse(localStorage.getItem(indexData.chunks[i]));
-            if (nodeChunk && nodeChunk.nodes) {
-                // 合并节点数据
-                Object.assign(storyNodes, nodeChunk.nodes);
+            try {
+                const nodeChunkKey = indexData.chunks[i];
+                const nodeChunk = JSON.parse(localStorage.getItem(nodeChunkKey));
+                if (nodeChunk && nodeChunk.nodes) {
+                    // 合并节点数据
+                    Object.assign(storyNodes, nodeChunk.nodes);
+                }
+            } catch (error) {
+                console.warn(`加载节点分块 ${i} 失败:`, error);
             }
         }
         
         // 重建故事树
         gameState.storyTree = buildStoryTreeFromNodes(storyNodes);
         
-        // 恢复当前节点
-        if (currentNodeId && storyNodes[currentNodeId]) {
-            currentStoryNode = storyNodes[currentNodeId];
-        } else {
-            console.warn('无法恢复当前节点，使用初始节点');
-            currentStoryNode = storyContent.opening;
-        }
+        // 更新节点缓存
+        window._gameNodeCache = window._gameNodeCache || {};
+        Object.keys(storyNodes).forEach(nodeId => {
+            window._gameNodeCache[nodeId] = { ...storyNodes[nodeId] };
+        });
         
         // 设置为当前存档
         localStorage.setItem('gameSettings_current', archiveKey);
         
-        console.log('游戏已从分块存档加载:', archiveKey);
+        console.log('游戏数据已从分块存档加载:', archiveKey);
         return true;
     } catch (error) {
         console.error('加载分块存档失败:', error);
@@ -3983,7 +4061,7 @@ async function generateImage(settings) {
     return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
 }
 
-// 加载已保存的游戏函数
+// 修改加载已保存的游戏函数
 function loadSavedGame(archiveKey) {
     // 加载存档内容
     const success = loadGameFromArchive(archiveKey);
@@ -3999,6 +4077,89 @@ function loadSavedGame(archiveKey) {
         document.querySelector('.story-content').style.display = 'block';
         document.querySelector('.choices-container').style.display = 'block';
         document.querySelector('.story-image-container').style.display = 'block';
+        
+        // 从游戏进度中恢复当前节点
+        try {
+            const archiveData = JSON.parse(localStorage.getItem(archiveKey));
+            
+            // 确定当前节点ID
+            let currentNodeId;
+            
+            // 检查存档是否为分块存储
+            if (archiveData && archiveData.isChunked) {
+                const progressChunkKey = archiveData.chunks && archiveData.chunks.length > 3 ? archiveData.chunks[3] : null;
+                if (progressChunkKey) {
+                    const progressChunk = JSON.parse(localStorage.getItem(progressChunkKey));
+                    if (progressChunk && progressChunk.gameProgress) {
+                        currentNodeId = progressChunk.gameProgress.currentNodeId;
+                    }
+                }
+            } else if (archiveData && archiveData.gameProgress) {
+                currentNodeId = archiveData.gameProgress.currentNodeId;
+            }
+            
+            // 寻找当前节点数据
+            if (currentNodeId) {
+                // 首先从节点缓存中查找
+                if (window._gameNodeCache && window._gameNodeCache[currentNodeId]) {
+                    currentStoryNode = window._gameNodeCache[currentNodeId];
+                } else {
+                    // 否则尝试从存档的storyNodes中获取
+                    let nodeData = null;
+                    
+                    // 如果是分块存档，需要从节点块中查找
+                    if (archiveData && archiveData.isChunked) {
+                        for (let i = 4; i < archiveData.chunks.length; i++) {
+                            try {
+                                const nodeChunkKey = archiveData.chunks[i];
+                                const nodeChunk = JSON.parse(localStorage.getItem(nodeChunkKey));
+                                if (nodeChunk && nodeChunk.nodes && nodeChunk.nodes[currentNodeId]) {
+                                    nodeData = nodeChunk.nodes[currentNodeId];
+                                    break;
+                                }
+                            } catch (e) {
+                                console.warn(`无法读取节点块 ${i}:`, e);
+                            }
+                        }
+                    } else if (archiveData && archiveData.storyNodes && archiveData.storyNodes[currentNodeId]) {
+                        // 从常规存档中获取节点
+                        nodeData = archiveData.storyNodes[currentNodeId];
+                    }
+                    
+                    if (nodeData) {
+                        currentStoryNode = nodeData;
+                    } else {
+                        console.warn('无法找到当前节点数据，使用初始节点');
+                        currentStoryNode = storyContent.opening;
+                    }
+                }
+            } else {
+                console.warn('存档中没有当前节点ID，使用初始节点');
+                currentStoryNode = storyContent.opening;
+            }
+            
+            // 确保当前节点有选项
+            if (!currentStoryNode.choices || !Array.isArray(currentStoryNode.choices) || currentStoryNode.choices.length === 0) {
+                console.log('为当前节点生成默认选项');
+                currentStoryNode.choices = [
+                    {
+                        text: "继续探索",
+                        effect: "探索未知的区域",
+                        nextContent: "你决定继续前进，寻找更多的线索..."
+                    },
+                    {
+                        text: "寻找其他路径",
+                        effect: "开辟新的方向",
+                        nextContent: "你决定尝试不同的方向，希望能找到突破口..."
+                    }
+                ];
+            }
+            
+        } catch (error) {
+            console.error('恢复当前节点失败:', error);
+            // 如果恢复失败，使用初始节点
+            currentStoryNode = storyContent.opening;
+        }
         
         // 更新故事显示
         updateStoryDisplay(currentStoryNode);
