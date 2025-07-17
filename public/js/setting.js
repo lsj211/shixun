@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             allKeys = allKeys.filter(k => k !== selectedKey);
                             localStorage.setItem(keyName, JSON.stringify(allKeys));
                             // 如果当前存档被删，清除current
-                            const currentKey = currentMode === 'play' ? 'gameSettings_current' : 'creatorSettings_current';
+                            const currentKey = currentMode === 'game' ? 'gameSettings_current' : 'creatorSettings_current';
                             if (localStorage.getItem(currentKey) === selectedKey) {
                                 localStorage.removeItem(currentKey);
                             }
@@ -96,7 +96,7 @@ document.addEventListener('DOMContentLoaded', () => {
         useArchiveBtn.onclick = () => {
             const selectedKey = archiveSelect.value;
             if (selectedKey) {
-                if (currentMode === 'play') {
+                if (currentMode === 'game') {
                     localStorage.setItem('gameSettings_current', selectedKey);
                     window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
                 } else if (currentMode === 'create') {
@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // 创建新存档
         newArchiveBtn.onclick = () => {
             archiveSection.classList.add('hidden');
-            if (currentMode === 'play') {
+            if (currentMode === 'game') {
                 playModeSettings.classList.remove('hidden');
                 initPlayMode(gameSettings);
             } else if (currentMode === 'create') {

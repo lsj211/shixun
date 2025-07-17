@@ -3291,7 +3291,7 @@ function updateLoadingText(text) {
     }
 }
 
-// 修改保存游戏状态的函数，使用标题+时间命名存档
+// 修改保存游戏状态的函数，改进日期格式化逻辑
 function saveGameToArchive(archiveKey = null) {
     // 获取当前节点标题作为存档名称基础
     let titleBase = "无标题存档";
@@ -3306,16 +3306,22 @@ function saveGameToArchive(archiveKey = null) {
         }
     }
     
-    // 生成时间字符串，格式：YYYY-MM-DD_HH-MM-SS
+    // 生成格式化日期时间字符串，确保格式有效
     const now = new Date();
-    const timeStr = now.toISOString()
-        .replace('T', '_')
-        .replace(/:/g, '-')
-        .substring(0, 19);
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    const seconds = String(now.getSeconds()).padStart(2, '0');
     
-    // 生成存档键，格式：archive_标题_时间戳
+    // 格式化为 YYYY/MM/DD HH:MM:SS
+    const dateTimeStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    
+    // 生成存档键，格式：archive_标题_YYYYMMDDHHMMSS
     if (!archiveKey) {
-        archiveKey = `archive_${titleBase}_${timeStr}`;
+        const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
+        archiveKey = `archive_${titleBase}_${timeForKey}`;
         // 替换可能导致问题的字符
         archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
     }
@@ -3325,8 +3331,8 @@ function saveGameToArchive(archiveKey = null) {
         // 基本信息
         meta: {
             timestamp: now.getTime(),
-            saveDate: now.toLocaleString(),
-            saveTitle: `${titleBase} - ${now.toLocaleString()}`,
+            saveDate: dateTimeStr,  // 使用格式化后的日期时间
+            saveTitle: `${titleBase} - ${dateTimeStr}`,  // 同样使用格式化后的日期时间
             complexity: gameState.settings.complexity,
             chapterCount: gameState.settings.chapterCount,
             currentChapter: gameState.currentChapter,
@@ -3640,6 +3646,31 @@ function loadGameFromChunks(archiveKey, indexData) {
 }
 
 // 从节点集合构建故事树
+function buildStoryTreeFromNodes(nodesMap) {
+    const rootNodes = [];
+    const nodeMap = {}; // 用于快速查找
+    
+    // 首先创建所有节点的浅拷贝
+    Object.keys(nodesMap).forEach(nodeId => {
+        const node = nodesMap[nodeId];
+        nodeMap[nodeId] = { ...node, children: [] };
+    });
+    
+    // 建立父子关系
+    Object.keys(nodeMap).forEach(nodeId => {
+        const node = nodeMap[nodeId];
+        if (node.parentId && nodeMap[node.parentId]) {
+            // 如果有父节点，将此节点添加为父节点的子节点
+            nodeMap[node.parentId].children.push(node);
+        } else {
+            // 没有父节点或父节点不在地图中，视为根节点
+            rootNodes.push(node);
+        }
+    });
+    
+    return rootNodes;
+}
+
 function initSaveGameFeature() {
     // 获取已有的保存进度按钮
     const saveBtn = document.querySelector('.save-btn');
@@ -3946,7 +3977,53 @@ async function generateImage(settings) {
     return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
 }
 
-// 在文档加载完成后添加开始游戏按钮
+// 加载已保存的游戏函数
+function loadSavedGame(archiveKey) {
+    // 加载存档内容
+    const success = loadGameFromArchive(archiveKey);
+    
+    if (success) {
+        // 隐藏开始游戏区域
+        const startGameArea = document.querySelector('.start-game-area');
+        if (startGameArea) {
+            startGameArea.classList.add('hidden');
+        }
+        
+        // 显示游戏内容
+        document.querySelector('.story-content').style.display = 'block';
+        document.querySelector('.choices-container').style.display = 'block';
+        document.querySelector('.story-image-container').style.display = 'block';
+        
+        // 更新故事显示
+        updateStoryDisplay(currentStoryNode);
+        updateChoices(currentStoryNode.choices);
+        
+        // 更新侧边栏剧情树
+        updateSidePanelStoryTree();
+        
+        // 更新章节进度
+        updateChapterProgress();
+        
+        console.log('从存档加载游戏成功:', archiveKey);
+    } else {
+        console.error('加载存档失败:', archiveKey);
+        // 加载失败时显示开始游戏按钮
+        document.querySelector('.story-content').style.display = 'none';
+        document.querySelector('.choices-container').style.display = 'none';
+        document.querySelector('.story-image-container').style.display = 'none';
+        document.querySelector('.start-game-area').classList.remove('hidden');
+    }
+    
+    // 初始化游戏功能
+    initSaveGameFeature();
+    initializeEditFeatures();
+    initializeStoryInfoButtons();
+    initializeStoryTreeFeatures();
+    initializeSettingsInfoButton();
+    initializeImageGeneration();
+}
+
+// 修改 DOMContentLoaded 事件处理函数，检查存档是否已有游戏内容
 document.addEventListener('DOMContentLoaded', () => {
     // 创建开始游戏按钮区域
     const startGameArea = document.createElement('div');
@@ -3972,6 +4049,41 @@ document.addEventListener('DOMContentLoaded', () => {
         storyContainer.parentNode.insertBefore(startGameArea, storyContainer);
     }
     
+    // 获取当前存档键
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    
+    // 检查是否从存档加载游戏且存档中已有游戏内容
+    if (archiveKey) {
+        try {
+            const archiveData = JSON.parse(localStorage.getItem(archiveKey));
+            
+            // 检查存档是否为分块存储
+            if (archiveData && archiveData.isChunked) {
+                // 检查分块存档中是否有游戏进度数据
+                const progressChunkKey = archiveData.chunks && archiveData.chunks.length > 3 ? archiveData.chunks[3] : null;
+                if (progressChunkKey) {
+                    const progressChunk = JSON.parse(localStorage.getItem(progressChunkKey));
+                    if (progressChunk && progressChunk.gameProgress && progressChunk.gameProgress.currentNodeId) {
+                        // 有游戏进度，直接加载存档
+                        loadSavedGame(archiveKey);
+                        return; // 加载存档后退出初始化函数
+                    }
+                }
+            } 
+            // 检查常规存档是否有游戏进度
+            else if (archiveData && archiveData.gameProgress && archiveData.gameProgress.currentNodeId) {
+                // 有游戏进度，直接加载存档
+                loadSavedGame(archiveKey);
+                return; // 加载存档后退出初始化函数
+            }
+        } catch (error) {
+            console.error('检查存档失败:', error);
+            // 出错时继续初始化游戏
+        }
+    }
+    
+    // 如果没有加载现有存档或存档中没有游戏内容，则显示开始游戏按钮
     // 隐藏故事内容和选择区域，直到游戏开始
     document.querySelector('.story-content').style.display = 'none';
     document.querySelector('.choices-container').style.display = 'none';
