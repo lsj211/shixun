@@ -146,18 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
         chapterCount: 5
     };
     
-    // // // =================== 模式选择逻辑 ===================
-    // playModeBtn.addEventListener('click', () => {
-    //     modeSelection.classList.add('hidden');
-    //     playModeSettings.classList.remove('hidden');
-    //     initPlayMode(gameSettings); // 初始化游玩模式
-    // });
-    
-    // createModeBtn.addEventListener('click', () => {
-    //     modeSelection.classList.add('hidden');
-    //     createModeSettings.classList.remove('hidden');
-    // });
-    
 
 
     // 封装游玩模式初始化为函数
