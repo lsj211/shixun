@@ -228,6 +228,64 @@ app.get('/health', async (req, res) => {
     }
 });
 
+// 添加故事大纲生成API代理
+app.post('/api/generate-story-outline', (req, res) => {
+    const { background, timeline, locations, characters, chapterCount, complexity } = req.body;
+    const cacheKey = `outline_${background.substring(0, 50)}_${complexity}_${chapterCount}`;
+    getFromCache(cacheKey).then(cachedContent => {
+        if (cachedContent) {
+            return res.json({ outline: cachedContent });
+        } else {
+            streamProxyToPython(req, res, '/api/generate-story-outline');
+        }
+    }).catch(err => {
+        console.error('读取缓存失败:', err);
+        streamProxyToPython(req, res, '/api/generate-story-outline');
+    });
+});
+
+// 添加章节内容生成API代理
+app.post('/api/generate-chapter', (req, res) => {
+    const { background, timeline, locations, characters, complexity, chapterNumber, sceneNumber, outline } = req.body;
+    const cacheKey = `chapter_${chapterNumber}_${sceneNumber}_${background.substring(0, 30)}_${complexity}`;
+    getFromCache(cacheKey).then(cachedContent => {
+        if (cachedContent) {
+            return res.json(cachedContent);
+        } else {
+            streamProxyToPython(req, res, '/api/generate-chapter');
+        }
+    }).catch(err => {
+        console.error('读取缓存失败:', err);
+        streamProxyToPython(req, res, '/api/generate-chapter');
+    });
+});
+
+// 添加增强背景生成API代理 - 在其他API代理之后添加
+app.post('/api/enhance-background', (req, res) => {
+    const { background, complexity, chapterCount, enhance_only } = req.body;
+    const cacheKey = `enhance_${background.substring(0, 50)}_${complexity}_${chapterCount}`;
+    
+    getFromCache(cacheKey).then(cachedContent => {
+        if (cachedContent) {
+            if (req.headers.accept && req.headers.accept.includes('text/event-stream')) {
+                // 流式响应
+                res.setHeader('Content-Type', 'text/event-stream');
+                res.write(`data: ${JSON.stringify({ text: cachedContent, done: true })}\n\n`);
+                res.end();
+            } else {
+                // 普通响应
+                res.json({ background: cachedContent });
+            }
+        } else {
+            // 代理到Python后端
+            streamProxyToPython(req, res, '/api/enhance-background');
+        }
+    }).catch(err => {
+        console.error('读取缓存失败:', err);
+        streamProxyToPython(req, res, '/api/enhance-background');
+    });
+});
+
 // 首页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));

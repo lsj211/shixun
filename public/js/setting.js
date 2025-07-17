@@ -246,7 +246,8 @@ document.addEventListener('DOMContentLoaded', () => {
         let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
         allKeys.push(key);
         localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
-
+        // 设置标记，指示这是从设定页面开始的新游戏
+        sessionStorage.setItem('newGameFromSettings', 'true');
         // 跳转到游戏页面
         window.location.href = 'game.html';
     });

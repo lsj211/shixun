@@ -2,10 +2,11 @@ import os
 import json
 import time
 import asyncio
-from typing import Dict, List, Optional, Union, AsyncGenerator
+# 修改导入语句，添加Any
+from typing import Dict, List, Optional, Union, AsyncGenerator, Any
 from datetime import datetime, timedelta
 from pathlib import Path
-
+import re
 # 导入 dotenv 用于加载环境变量
 try:
     from dotenv import load_dotenv
@@ -432,6 +433,220 @@ async def root():
             "/api/generate-story-node"
         ]
     }
+
+# 添加新的请求模型
+class StoryOutlineRequest(BaseModel):
+    background: str
+    timeline: List[Dict[str, str]] = []
+    locations: List[Dict[str, str]] = []
+    characters: List[Dict[str, Any]] = []
+    chapterCount: int = 5
+    complexity: str = "medium"
+
+class ChapterRequest(BaseModel):
+    background: str
+    timeline: List[Dict[str, str]] = []
+    locations: List[Dict[str, str]] = []
+    characters: List[Dict[str, Any]] = []
+    complexity: str = "medium"
+    chapterNumber: int = 1
+    sceneNumber: int = 1
+    outline: str = ""
+
+# 生成故事大纲API
+@app.post("/api/generate-story-outline")
+async def generate_story_outline(request: StoryOutlineRequest):
+    """生成故事大纲"""
+    # 创建缓存键
+    cache_key = f"outline_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+    
+    # 检查缓存
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        return {"outline": cached_content}
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的交互式小说大纲设计师。请根据提供的世界观背景、前情提要、重要地点和角色信息，"
+        f"创建一个{request.chapterCount}章的故事大纲。\n\n"
+        "请遵循以下要求：\n"
+        "1. 大纲应该包含每章的主要内容概述\n"
+        "2. 每章应包含2-3个关键场景\n"
+        "3. 标明每章涉及的主要角色\n"
+        "4. 在大纲中设计合理的冲突和转折\n"
+        "5. 大纲应该与提供的背景设定保持一致\n"
+        f"6. 按照{request.complexity}级别的复杂度设计情节\n"
+        "7. 根据角色的特性设计合适的情节和角色互动\n\n"
+        "大纲格式请严格按如下格式输出：\n"
+        "第一章：[章节标题]\n"
+        "- 场景概述：[场景1概述]\n"
+        "- 场景概述：[场景2概述]\n"
+        "- 涉及角色：[角色列表]\n"
+        "- 关键事件：[事件描述]\n\n"
+        "第二章：[章节标题]\n"
+        "... 以此类推\n\n"
+        "确保大纲具有连贯性和叙事张力，为后续章节内容生成提供足够的指导。"
+    )
+    
+    human_template = (
+        f"世界背景：{request.background}\n\n"
+        f"前情提要：\n{format_timeline(request.timeline)}\n\n"
+        f"重要地点：\n{format_locations(request.locations)}\n\n"
+        f"角色信息：\n{format_characters(request.characters)}\n\n"
+        f"章节数量：{request.chapterCount}章\n"
+        f"故事复杂度：{request.complexity} (简单/中等/复杂)\n\n"
+        f"请为这个故事世界创建一个{request.chapterCount}章的完整大纲。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        outline = response.content
+        
+        # 保存到缓存
+        save_to_cache(cache_key, outline)
+        
+        return {"outline": outline}
+    except Exception as e:
+        print(f"生成大纲失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成大纲失败: {str(e)}")
+
+# 生成章节内容API
+@app.post("/api/generate-chapter")
+async def generate_chapter(request: ChapterRequest):
+    """生成章节内容"""
+    # 创建缓存键
+    cache_key = f"chapter_{request.chapterNumber}_{request.sceneNumber}_{request.background[:30]}_{request.complexity}"
+    
+    # 检查缓存
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        return cached_content
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的交互式小说作家。请根据提供的世界观背景、角色信息和故事大纲，"
+        f"创作第{request.chapterNumber}章第{request.sceneNumber}场景的具体内容。\n\n"
+        "请遵循以下要求：\n"
+        "1. 内容应与大纲保持一致，但可以添加细节和对话\n"
+        "2. 场景应该有生动的描述和角色互动\n"
+        "3. 结尾处设计2-3个有意义的选择，这些选择应该能引导故事向不同方向发展\n"
+        "4. 每个选择应包含简短的效果提示\n"
+        "5. 章节标题应该简洁有吸引力\n"
+        f"6. 按照{request.complexity}级别的复杂度设计场景和对话\n\n"
+        "返回JSON格式：\n"
+        "{\n"
+        '  "title": "第X章：章节标题",\n'
+        '  "content": "详细的场景描述和对话内容...",\n'
+        '  "choices": [\n'
+        '    {"text": "选择1文本", "effect": "选择1效果", "nextContent": "选择1后的简短内容预览"},\n'
+        '    {"text": "选择2文本", "effect": "选择2效果", "nextContent": "选择2后的简短内容预览"},\n'
+        '    {"text": "选择3文本", "effect": "选择3效果", "nextContent": "选择3后的简短内容预览"}\n'
+        '  ]\n'
+        "}"
+    )
+    
+    human_template = (
+        f"世界背景：{request.background}\n\n"
+        f"前情提要：\n{format_timeline(request.timeline)}\n\n"
+        f"重要地点：\n{format_locations(request.locations)}\n\n"
+        f"角色信息：\n{format_characters(request.characters)}\n\n"
+        f"故事大纲：\n{request.outline}\n\n"
+        f"当前任务：请创作第{request.chapterNumber}章第{request.sceneNumber}场景的详细内容，"
+        f"按照要求提供章节标题、详细内容和2-3个选择。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        
+        # 尝试解析JSON响应
+        content = response.content
+        
+        # 处理可能的多行JSON格式问题
+        try:
+            result = json.loads(content)
+        except:
+            # 尝试提取JSON部分
+            json_match = re.search(r'(\{[\s\S]*\})', content)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group(1))
+                except:
+                    # 如果仍然失败，则构造一个基本结构
+                    result = {
+                        "title": f"第{request.chapterNumber}章：新的冒险",
+                        "content": content,
+                        "choices": [
+                            {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
+                            {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
+                        ]
+                    }
+            else:
+                # 构造一个基本结构
+                result = {
+                    "title": f"第{request.chapterNumber}章：新的冒险",
+                    "content": content,
+                    "choices": [
+                        {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
+                        {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
+                    ]
+                }
+        
+        # 保存到缓存
+        save_to_cache(cache_key, result)
+        
+        return result
+    except Exception as e:
+        print(f"生成章节内容失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成章节内容失败: {str(e)}")
+
+# 辅助函数：格式化时间线数据
+def format_timeline(timeline):
+    if not timeline:
+        return "无"
+    
+    result = []
+    for event in timeline:
+        title = event.get("title", "未知事件")
+        content = event.get("content", "")
+        result.append(f"- {title}：{content}")
+    
+    return "\n".join(result)
+
+# 辅助函数：格式化地点数据
+def format_locations(locations):
+    if not locations:
+        return "无"
+    
+    result = []
+    for location in locations:
+        name = location.get("name", "未知地点")
+        description = location.get("description", "")
+        result.append(f"- {name}：{description}")
+    
+    return "\n".join(result)
+
+# 辅助函数：格式化角色数据
+def format_characters(characters):
+    if not characters:
+        return "无"
+    
+    result = []
+    for character in characters:
+        name = character.get("name", "未知角色")
+        description = character.get("description", "")
+        result.append(f"- {name}：{description}")
+    
+    return "\n".join(result)
 
 # 启动服务器（开发环境）
 if __name__ == "__main__":

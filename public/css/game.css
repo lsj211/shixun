@@ -1180,3 +1180,96 @@ body {
             margin: 3px;
             font-size: 0.9em;
         }
+        /* 添加到现有样式中 */
+.start-game-area {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 50px 0;
+    transition: all 0.5s ease;
+}
+
+.start-game-container {
+    text-align: center;
+    background-color: rgba(255, 255, 255, 0.9);
+    border-radius: 12px;
+    padding: 30px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    max-width: 600px;
+    width: 100%;
+}
+
+.start-game-container h2 {
+    font-size: 28px;
+    margin-bottom: 20px;
+    color: #333;
+}
+
+.start-game-container p {
+    margin-bottom: 30px;
+    color: #666;
+    font-size: 16px;
+}
+
+.start-game-btn {
+    background: linear-gradient(135deg, #4CAF50, #2E7D32);
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 18px;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(46, 125, 50, 0.3);
+}
+
+.start-game-btn i {
+    margin-right: 10px;
+    font-size: 18px;
+}
+
+.start-game-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 15px rgba(46, 125, 50, 0.4);
+    background: linear-gradient(135deg, #43A047, #2E7D32);
+}
+
+.start-game-loading {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 15px;
+    border-radius: 50%;
+    border: 4px solid rgba(76, 175, 80, 0.2);
+    border-top-color: #4CAF50;
+    animation: spin 1s infinite linear;
+}
+
+.loading-progress-text {
+    font-size: 14px;
+    color: #666;
+    margin-top: 15px;
+}
+
+.hidden {
+    display: none;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 当游戏开始后隐藏开始区域 */
+.start-game-area.hidden {
+    height: 0;
+    margin: 0;
+    overflow: hidden;
+    opacity: 0;
+}

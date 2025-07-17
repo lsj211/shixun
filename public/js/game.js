@@ -1250,32 +1250,48 @@ function extractWorldBuilding(backgroundText) {
 
 // 修改从背景中提取地点的函数，匹配重要地点格式
 function extractLocationsFromBackground(backgroundText) {
-    // 尝试匹配标准格式的重要地点
-    const standardFormatRegex = /重要地点[:：]\s*(.*?)[\s\n]*名称[:：]\s*(.*?)[\s\n]*描述[:：]\s*(.*?)(?=(?:重要地点[:：]|前情提要[:：]|$))/gs;
+    // 尝试匹配格式: 重要地点：内容...(直到下一个重要地点/前情提要/标题)
+    const locationsRegex = /重要地点[:：]\s*(.*?)(?=(?:重要地点[:：]|前情提要[:：]|标题[:：]|$))/gs;
     let locationsList = [];
     let match;
     
-    // 首先尝试提取标准格式的重要地点
-    while ((match = standardFormatRegex.exec(backgroundText)) !== null) {
-        if (match[2] && match[3]) {
-            locationsList.push({
-                name: match[2].trim(),
-                description: match[3].trim()
-            });
-        } else if (match[1]) {
-            // 如果只匹配到重要地点但没有名称和描述
-            locationsList.push({
-                name: match[1].trim(),
-                description: "详细信息未提供"
-            });
+    // 提取重要地点
+    while ((match = locationsRegex.exec(backgroundText)) !== null) {
+        if (match[1] && match[1].trim()) {
+            // 尝试从提取的内容中找出名称和描述
+            const nameMatch = match[1].match(/名称[:：]\s*(.*?)(?:\n|$)/i);
+            const descMatch = match[1].match(/描述[:：]\s*(.*?)(?:\n|$)/is);
+            
+            if (nameMatch && descMatch) {
+                locationsList.push({
+                    name: nameMatch[1].trim(),
+                    description: descMatch[1].trim()
+                });
+            } else {
+                // 如果没有明确的名称和描述格式，则尝试按句子或段落划分
+                const content = match[1].trim();
+                const lines = content.split('\n');
+                
+                if (lines.length > 1) {
+                    locationsList.push({
+                        name: lines[0].trim(),
+                        description: content.substring(lines[0].length).trim()
+                    });
+                } else {
+                    locationsList.push({
+                        name: "地点",
+                        description: content
+                    });
+                }
+            }
         }
     }
     
-    // 如果没有找到标准格式，尝试匹配简化格式（只有名称和描述）
+    // 尝试匹配标准格式: 名称：xxx 描述：xxx
     if (locationsList.length === 0) {
-        const simplifiedFormatRegex = /名称[:：]\s*(.*?)[\s\n]*描述[:：]\s*(.*?)(?=(?:名称[:：]|前情提要[:：]|$))/gs;
+        const nameDescRegex = /名称[:：]\s*(.*?)[\s\n]*描述[:：]\s*(.*?)(?=(?:名称[:：]|前情提要[:：]|标题[:：]|$))/gs;
         
-        while ((match = simplifiedFormatRegex.exec(backgroundText)) !== null) {
+        while ((match = nameDescRegex.exec(backgroundText)) !== null) {
             if (match[1] && match[2]) {
                 locationsList.push({
                     name: match[1].trim(),
@@ -2755,15 +2771,24 @@ function updateSettingsInfoContent() {
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
     
-    // 从当前存档获取游戏设置，而不是默认的gameSettings
+    // 获取游戏设置
     let gameSettings;
     try {
-        // 优先使用当前存档中的设定
-        if (archiveKey) {
+        // 首先检查是否从设定页面跳转过来的新游戏
+        const isNewGameFromSettings = sessionStorage.getItem('newGameFromSettings');
+        
+        if (isNewGameFromSettings === 'true') {
+            // 如果是从设定页面开始的新游戏，优先使用gameSettings
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+            console.log('从设定页面加载游戏设置');
+        }
+        // 如果不是新游戏或找不到设定，则尝试从当前存档获取
+        else if (archiveKey) {
             gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
             console.log('从当前存档加载设定:', archiveKey);
-        } else {
-            // 如果没有当前存档，则使用默认设置
+        } 
+        // 最后才使用默认设置
+        else {
             gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
             console.log('使用默认设定');
         }
@@ -2817,8 +2842,10 @@ function updateSettingsInfoContent() {
     // 显示章节数
     const chapterCountEl = document.getElementById('settingsChapterCount');
     chapterCountEl.textContent = gameSettings.chapterCount || '未指定';
+    
+    // 使用完毕后清除新游戏标记，以免影响后续操作
+    sessionStorage.removeItem('newGameFromSettings');
 }
-
 // AI辅助生成节点内容
 async function generateNodeContentWithAI(parentNodeContent = null) {
     try {
@@ -3039,6 +3066,672 @@ function updateSidePanelStoryTree() {
     
     sideTreeContainer.innerHTML = pathHTML;
 }
+// 开始游戏函数 - 生成故事大纲和第一章内容
+async function startGame() {
+    try {
+        // 显示加载状态
+        document.getElementById('startGameBtn').classList.add('hidden');
+        document.getElementById('startGameLoading').classList.remove('hidden');
+        
+        // 获取游戏设置和世界观数据
+        const gameData = collectGameData();
+        
+        // 更新加载状态文本
+        updateLoadingText('正在生成故事大纲...');
+        
+        // 调用API生成故事大纲
+        const outlineResponse = await generateStoryOutline(gameData);
+        
+        // 保存大纲到游戏状态
+        gameState.storyOutline = outlineResponse.outline;
+        
+        // 更新加载状态文本
+        updateLoadingText('正在创作第一章内容...');
+        
+        // 生成第一章第一幕内容
+        const chapterResponse = await generateFirstChapter(gameData, outlineResponse.outline);
+        
+        // 更新加载状态文本
+        updateLoadingText('正在生成场景图像...');
+        
+        // 更新当前节点
+        currentStoryNode = {
+            id: 'chapter-1-scene-1',
+            title: chapterResponse.title,
+            content: chapterResponse.content,
+            choices: chapterResponse.choices,
+            chapter: 1,
+            scene: 1
+        };
+        
+        // 记录节点已被探索
+        gameState.exploredNodes.add(currentStoryNode.id);
+        gameState.currentPath.push(currentStoryNode.id);
+        
+        // 尝试生成图像
+        try {
+            await generateSceneImage(currentStoryNode.content);
+        } catch (imageError) {
+            console.warn('图像生成失败，使用默认图像', imageError);
+            document.getElementById('storyImage').src = 'test.png';
+        }
+        
+        // 隐藏开始游戏区域，显示故事内容
+        document.querySelector('.start-game-area').classList.add('hidden');
+        document.querySelector('.story-content').style.display = 'block';
+        document.querySelector('.choices-container').style.display = 'block';
+        document.querySelector('.story-image-container').style.display = 'block';
+        
+        // 更新故事显示
+        updateStoryDisplay(currentStoryNode);
+        updateChoices(currentStoryNode.choices);
+        updateSidePanelStoryTree();
+        updateChapterProgress();
+        
+    } catch (error) {
+        console.error('游戏启动失败:', error);
+        // 显示错误信息
+        document.getElementById('loadingProgressText').innerHTML = 
+            `<span style="color: red">启动失败: ${error.message || '请稍后重试'}</span>`;
+        
+        // 恢复开始按钮
+        setTimeout(() => {
+            document.getElementById('startGameBtn').classList.remove('hidden');
+            document.getElementById('startGameLoading').classList.add('hidden');
+        }, 2000);
+    }
+}
+
+// 生成故事大纲
+async function generateStoryOutline(gameData) {
+    // 请求后台API生成大纲
+    const response = await fetch('/api/generate-story-outline', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            background: gameData.background,
+            timeline: gameData.timeline,
+            locations: gameData.locations,
+            characters: gameData.characters,
+            chapterCount: gameData.chapterCount,
+            complexity: gameData.complexity
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('大纲生成失败');
+    }
+    
+    return await response.json();
+}
+
+// 生成第一章内容
+async function generateFirstChapter(gameData, outline) {
+    // 请求后台API生成第一章内容
+    const response = await fetch('/api/generate-chapter', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            background: gameData.background,
+            timeline: gameData.timeline,
+            locations: gameData.locations,
+            characters: gameData.characters,
+            complexity: gameData.complexity,
+            chapterNumber: 1,
+            sceneNumber: 1,
+            outline: outline
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('章节内容生成失败');
+    }
+    
+    return await response.json();
+}
+
+// 生成场景图片
+async function generateSceneImage(sceneContent) {
+    // 提取场景描述关键词
+    const description = extractSceneDescription(sceneContent);
+    
+    // 请求图像生成
+    const response = await fetch('/api/generate-image', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            description: description,
+            style: gameState.imageSettings.lastStyle || 'realistic',
+            colorTone: gameState.imageSettings.lastColorTone || 'warm'
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('图像生成失败');
+    }
+    
+    const data = await response.json();
+    
+    // 更新图像显示
+    document.getElementById('storyImage').src = data.imageUrl;
+}
+
+// 从场景内容提取适合图像生成的描述
+function extractSceneDescription(sceneContent) {
+    // 简单实现：取前100个字符作为描述
+    let description = sceneContent.substring(0, 100);
+    
+    // 尝试找到描述场景的句子
+    const sceneSentencePatterns = [
+        /(.{10,100}[^.。!！?？]+场景[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+环境[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+地点[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+看到[^.。!！?？]+[.。!！?？])/
+    ];
+    
+    for (const pattern of sceneSentencePatterns) {
+        const match = sceneContent.match(pattern);
+        if (match && match[1]) {
+            description = match[1];
+            break;
+        }
+    }
+    
+    return description;
+}
+
+// 收集游戏数据函数
+function collectGameData() {
+    // 获取当前激活的存档键
+    const urlParams = new URLSearchParams(window.location.search);
+    const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+    
+    // 收集游戏设置数据
+    let gameSettings;
+    try {
+        const isNewGameFromSettings = sessionStorage.getItem('newGameFromSettings');
+        
+        if (isNewGameFromSettings === 'true') {
+            // 如果是从设定页面开始的新游戏
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        } else if (archiveKey) {
+            // 如果从存档开始
+            gameSettings = JSON.parse(localStorage.getItem(archiveKey)) || {};
+        } else {
+            // 使用默认设置
+            gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
+        }
+    } catch (e) {
+        console.error('解析游戏设置失败:', e);
+        gameSettings = {};
+    }
+    
+    // 构建返回数据
+    return {
+        background: gameState.storyBackground || gameSettings.background || '',
+        timeline: gameState.timeline || gameSettings.generatedTimeline || [],
+        locations: gameState.locations || gameSettings.generatedLocations || [],
+        characters: gameState.characters || gameSettings.characters || [],
+        chapterCount: gameSettings.chapterCount || 5,
+        complexity: gameSettings.complexity || 'medium'
+    };
+}
+
+// 更新加载文本
+function updateLoadingText(text) {
+    const loadingText = document.getElementById('loadingProgressText');
+    if (loadingText) {
+        loadingText.textContent = text;
+    }
+}
+
+// 修改保存游戏状态的函数，使用标题+时间命名存档
+function saveGameToArchive(archiveKey = null) {
+    // 获取当前节点标题作为存档名称基础
+    let titleBase = "无标题存档";
+    if (currentStoryNode && currentStoryNode.title) {
+        // 从标题中提取章节信息
+        const chapterMatch = currentStoryNode.title.match(/第(\d+)章/);
+        if (chapterMatch) {
+            titleBase = `第${chapterMatch[1]}章`;
+        } else {
+            // 如果没有章节信息，使用标题前10个字符
+            titleBase = currentStoryNode.title.substring(0, 10);
+        }
+    }
+    
+    // 生成时间字符串，格式：YYYY-MM-DD_HH-MM-SS
+    const now = new Date();
+    const timeStr = now.toISOString()
+        .replace('T', '_')
+        .replace(/:/g, '-')
+        .substring(0, 19);
+    
+    // 生成存档键，格式：archive_标题_时间戳
+    if (!archiveKey) {
+        archiveKey = `archive_${titleBase}_${timeStr}`;
+        // 替换可能导致问题的字符
+        archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+    }
+    
+    // 创建分类的存档数据结构
+    const archiveData = {
+        // 基本信息
+        meta: {
+            timestamp: now.getTime(),
+            saveDate: now.toLocaleString(),
+            saveTitle: `${titleBase} - ${now.toLocaleString()}`,
+            complexity: gameState.settings.complexity,
+            chapterCount: gameState.settings.chapterCount,
+            currentChapter: gameState.currentChapter,
+            gameCompleted: gameState.gameCompleted || false,
+            version: '1.0'
+        },
+        
+        // 世界观背景数据
+        background: gameState.storyBackground || "",
+        generatedBackground: gameState.generatedBackground || "",
+        generatedTimeline: gameState.timeline || [],
+        generatedLocations: gameState.locations || [],
+        
+        // 角色数据
+        characters: gameState.characters || [],
+        
+        // 故事大纲
+        storyOutline: gameState.storyOutline || "",
+        
+        // 游戏进度数据
+        gameProgress: {
+            currentNodeId: currentStoryNode ? currentStoryNode.id : null,
+            exploredNodes: Array.from(gameState.exploredNodes || new Set()),
+            currentPath: gameState.currentPath || [],
+            history: gameState.history || []
+        },
+        
+        // 故事节点数据
+        storyNodes: {}
+    };
+    
+    // 收集所有已探索节点的完整数据
+    if (gameState.exploredNodes && gameState.exploredNodes.size > 0) {
+        Array.from(gameState.exploredNodes).forEach(nodeId => {
+            const nodeData = findExistingNodeData(nodeId);
+            if (nodeData) {
+                // 存储节点的完整数据
+                archiveData.storyNodes[nodeId] = {
+                    id: nodeData.id,
+                    title: nodeData.title,
+                    content: nodeData.content,
+                    choices: nodeData.choices,
+                    parentId: nodeData.parentId,
+                    chapter: nodeData.chapter,
+                    scene: nodeData.scene
+                };
+            }
+        });
+    }
+    
+    // 保存到 localStorage - 参考 setting.js 的方式
+    try {
+        // 保存存档数据
+        localStorage.setItem(archiveKey, JSON.stringify(archiveData));
+        localStorage.setItem('gameSettings_current', archiveKey);
+        
+        // 更新存档列表 - 与 setting.js 中的方式保持一致
+        let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+        if (!allKeys.includes(archiveKey)) {
+            allKeys.push(archiveKey);
+            localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+        }
+        
+        console.log('游戏已保存到存档:', archiveKey);
+        return true;
+    } catch (error) {
+        console.error('保存游戏失败:', error);
+        
+        // 如果是存储空间不足，尝试分块保存
+        if (error.name === 'QuotaExceededError' || error.code === 22) {
+            return saveGameInChunks(archiveKey, archiveData);
+        }
+        return false;
+    }
+}
+
+// 修改分块保存函数，确保使用相同的命名逻辑
+function saveGameInChunks(archiveKey, archiveData) {
+    try {
+        const baseKey = `${archiveKey}_chunk`;
+        
+        // 1. 保存元数据和世界观背景
+        const chunk1 = {
+            meta: archiveData.meta,
+            background: archiveData.background,
+            generatedBackground: archiveData.generatedBackground
+        };
+        localStorage.setItem(`${baseKey}_1`, JSON.stringify(chunk1));
+        
+        // 2. 保存时间线和地点
+        const chunk2 = {
+            generatedTimeline: archiveData.generatedTimeline,
+            generatedLocations: archiveData.generatedLocations
+        };
+        localStorage.setItem(`${baseKey}_2`, JSON.stringify(chunk2));
+        
+        // 3. 保存角色和大纲
+        const chunk3 = {
+            characters: archiveData.characters,
+            storyOutline: archiveData.storyOutline
+        };
+        localStorage.setItem(`${baseKey}_3`, JSON.stringify(chunk3));
+        
+        // 4. 保存游戏进度
+        localStorage.setItem(`${baseKey}_4`, JSON.stringify({
+            gameProgress: archiveData.gameProgress
+        }));
+        
+        // 5. 保存故事节点数据 - 可能需要进一步分块
+        const nodeIds = Object.keys(archiveData.storyNodes);
+        const chunkSize = 5; // 每个分块保存5个节点
+        const nodeChunks = [];
+        
+        for (let i = 0; i < nodeIds.length; i += chunkSize) {
+            const chunkNodes = {};
+            const chunk = nodeIds.slice(i, i + chunkSize);
+            
+            chunk.forEach(nodeId => {
+                chunkNodes[nodeId] = archiveData.storyNodes[nodeId];
+            });
+            
+            const chunkKey = `${baseKey}_nodes_${i}`;
+            localStorage.setItem(chunkKey, JSON.stringify({
+                nodes: chunkNodes
+            }));
+            nodeChunks.push(chunkKey);
+        }
+        
+        // 保存分块信息索引
+        const chunkIndex = {
+            baseKey: baseKey,
+            chunks: [
+                `${baseKey}_1`,
+                `${baseKey}_2`,
+                `${baseKey}_3`,
+                `${baseKey}_4`,
+                ...nodeChunks
+            ],
+            isChunked: true,
+            timestamp: archiveData.meta.timestamp,
+            saveDate: archiveData.meta.saveDate,
+            saveTitle: archiveData.meta.saveTitle
+        };
+        
+        localStorage.setItem(archiveKey, JSON.stringify(chunkIndex));
+        
+        // 设置当前存档
+        localStorage.setItem('gameSettings_current', archiveKey);
+        
+        // 更新存档列表
+        let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+        if (!allKeys.includes(archiveKey)) {
+            allKeys.push(archiveKey);
+            localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+        }
+        
+        console.log('游戏已分块保存到存档:', archiveKey);
+        return true;
+    } catch (error) {
+        console.error('分块保存游戏失败:', error);
+        return false;
+    }
+}
+
+
+// 从存档加载游戏状态
+function loadGameFromArchive(archiveKey) {
+    try {
+        // 获取存档数据
+        const archiveData = JSON.parse(localStorage.getItem(archiveKey));
+        if (!archiveData) {
+            console.error('存档不存在:', archiveKey);
+            return false;
+        }
+        
+        // 检查是否是分块存档
+        if (archiveData.isChunked) {
+            return loadGameFromChunks(archiveKey, archiveData);
+        }
+        
+        // 加载元数据
+        if (archiveData.meta) {
+            gameState.settings.complexity = archiveData.meta.complexity || 'medium';
+            gameState.settings.chapterCount = archiveData.meta.chapterCount || 5;
+            gameState.currentChapter = archiveData.meta.currentChapter || 1;
+            gameState.gameCompleted = archiveData.meta.gameCompleted || false;
+        }
+        
+        // 加载世界观背景
+        gameState.storyBackground = archiveData.background || "";
+        gameState.generatedBackground = archiveData.generatedBackground || "";
+        gameState.timeline = archiveData.generatedTimeline || [];
+        gameState.locations = archiveData.generatedLocations || [];
+        
+        // 加载角色
+        gameState.characters = archiveData.characters || [];
+        
+        // 加载故事大纲
+        gameState.storyOutline = archiveData.storyOutline || "";
+        
+        // 加载游戏进度
+        if (archiveData.gameProgress) {
+            gameState.exploredNodes = new Set(archiveData.gameProgress.exploredNodes || []);
+            gameState.currentPath = archiveData.gameProgress.currentPath || [];
+            gameState.history = archiveData.gameProgress.history || [];
+            
+            // 重建故事树
+            gameState.storyTree = buildStoryTreeFromNodes(archiveData.storyNodes || {});
+            
+            // 恢复当前节点
+            const currentNodeId = archiveData.gameProgress.currentNodeId;
+            if (currentNodeId && archiveData.storyNodes && archiveData.storyNodes[currentNodeId]) {
+                currentStoryNode = archiveData.storyNodes[currentNodeId];
+            } else {
+                console.warn('无法恢复当前节点，使用初始节点');
+                currentStoryNode = storyContent.opening;
+            }
+        }
+        
+        // 设置为当前存档
+        localStorage.setItem('gameSettings_current', archiveKey);
+        
+        console.log('游戏已从存档加载:', archiveKey);
+        return true;
+    } catch (error) {
+        console.error('加载存档失败:', error);
+        return false;
+    }
+}
+
+// 从分块存档加载游戏
+function loadGameFromChunks(archiveKey, indexData) {
+    try {
+        if (!indexData.chunks || !indexData.baseKey) {
+            console.error('分块存档索引无效:', archiveKey);
+            return false;
+        }
+        
+        // 从各个块中加载数据
+        // 1. 加载元数据和世界观
+        const chunk1 = JSON.parse(localStorage.getItem(indexData.chunks[0]));
+        if (chunk1) {
+            // 加载元数据
+            if (chunk1.meta) {
+                gameState.settings.complexity = chunk1.meta.complexity || 'medium';
+                gameState.settings.chapterCount = chunk1.meta.chapterCount || 5;
+                gameState.currentChapter = chunk1.meta.currentChapter || 1;
+                gameState.gameCompleted = chunk1.meta.gameCompleted || false;
+            }
+            
+            // 加载世界观背景
+            gameState.storyBackground = chunk1.background || "";
+            gameState.generatedBackground = chunk1.generatedBackground || "";
+        }
+        
+        // 2. 加载时间线和地点
+        const chunk2 = JSON.parse(localStorage.getItem(indexData.chunks[1]));
+        if (chunk2) {
+            gameState.timeline = chunk2.generatedTimeline || [];
+            gameState.locations = chunk2.generatedLocations || [];
+        }
+        
+        // 3. 加载角色和大纲
+        const chunk3 = JSON.parse(localStorage.getItem(indexData.chunks[2]));
+        if (chunk3) {
+            gameState.characters = chunk3.characters || [];
+            gameState.storyOutline = chunk3.storyOutline || "";
+        }
+        
+        // 4. 加载游戏进度
+        const chunk4 = JSON.parse(localStorage.getItem(indexData.chunks[3]));
+        let currentNodeId = null;
+        if (chunk4 && chunk4.gameProgress) {
+            gameState.exploredNodes = new Set(chunk4.gameProgress.exploredNodes || []);
+            gameState.currentPath = chunk4.gameProgress.currentPath || [];
+            gameState.history = chunk4.gameProgress.history || [];
+            currentNodeId = chunk4.gameProgress.currentNodeId;
+        }
+        
+        // 5. 加载故事节点数据
+        const storyNodes = {};
+        // 从第5块开始都是节点数据
+        for (let i = 4; i < indexData.chunks.length; i++) {
+            const nodeChunk = JSON.parse(localStorage.getItem(indexData.chunks[i]));
+            if (nodeChunk && nodeChunk.nodes) {
+                // 合并节点数据
+                Object.assign(storyNodes, nodeChunk.nodes);
+            }
+        }
+        
+        // 重建故事树
+        gameState.storyTree = buildStoryTreeFromNodes(storyNodes);
+        
+        // 恢复当前节点
+        if (currentNodeId && storyNodes[currentNodeId]) {
+            currentStoryNode = storyNodes[currentNodeId];
+        } else {
+            console.warn('无法恢复当前节点，使用初始节点');
+            currentStoryNode = storyContent.opening;
+        }
+        
+        // 设置为当前存档
+        localStorage.setItem('gameSettings_current', archiveKey);
+        
+        console.log('游戏已从分块存档加载:', archiveKey);
+        return true;
+    } catch (error) {
+        console.error('加载分块存档失败:', error);
+        return false;
+    }
+}
+
+// 从节点集合构建故事树
+function initSaveGameFeature() {
+    // 获取已有的保存进度按钮
+    const saveBtn = document.querySelector('.save-btn');
+    
+    // 如果找到了保存按钮，添加点击事件
+    if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+            // 调用存档函数，不传入archiveKey参数，让它自动生成"标题+时间"的键
+            if (saveGameToArchive()) {
+                // 显示保存成功通知
+                showSaveNotification();
+            } else {
+                alert('保存游戏失败，请重试');
+            }
+        });
+    }
+    
+    // 添加保存快捷键 (Ctrl+S)
+    document.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+            e.preventDefault(); // 阻止浏览器默认保存页面行为
+            
+            // 同样不传入archiveKey参数，使用自动生成的"标题+时间"命名
+            if (saveGameToArchive()) {
+                showSaveNotification();
+            }
+        }
+    });
+    
+    // 添加自动保存功能（每5分钟自动保存一次）
+    setInterval(() => {
+        // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
+        const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
+        saveGameToArchive(autoSaveName);
+        console.log('游戏已自动保存');
+    }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
+    
+    // 获取已有的加载进度按钮
+    const loadBtn = document.querySelector('.load-btn');
+    
+    // 如果找到了加载按钮，添加点击事件
+    if (loadBtn) {
+        loadBtn.addEventListener('click', () => {
+            // 打开存档列表模态框
+            openArchiveManager();
+        });
+    }
+}
+// 显示保存成功的通知
+function showSaveNotification() {
+    // 创建通知元素
+    const notification = document.createElement('div');
+    notification.className = 'save-notification';
+    notification.innerHTML = '<i class="fas fa-check-circle"></i> 游戏已保存';
+    
+    // 设置样式
+    notification.style.position = 'fixed';
+    notification.style.bottom = '20px';
+    notification.style.right = '20px';
+    notification.style.backgroundColor = 'rgba(76, 175, 80, 0.9)';
+    notification.style.color = 'white';
+    notification.style.padding = '10px 20px';
+    notification.style.borderRadius = '4px';
+    notification.style.boxShadow = '0 2px 8px rgba(0, 0, 0, 0.2)';
+    notification.style.zIndex = '9999';
+    notification.style.display = 'flex';
+    notification.style.alignItems = 'center';
+    notification.style.gap = '8px';
+    notification.style.fontSize = '14px';
+    notification.style.opacity = '0';
+    notification.style.transform = 'translateY(20px)';
+    notification.style.transition = 'opacity 0.3s, transform 0.3s';
+    
+    // 添加到文档
+    document.body.appendChild(notification);
+    
+    // 显示通知
+    setTimeout(() => {
+        notification.style.opacity = '1';
+        notification.style.transform = 'translateY(0)';
+    }, 10);
+    
+    // 3秒后隐藏并移除通知
+    setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateY(20px)';
+        
+        setTimeout(() => {
+            notification.remove();
+        }, 300);
+    }, 3000);
+}
 // 更新左侧面板剧情树样式，移除可点击的视觉提示
 document.addEventListener('DOMContentLoaded', () => {
     // 创建样式元素
@@ -3253,26 +3946,45 @@ async function generateImage(settings) {
     return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
 }
 
-// 在初始化函数中添加图片生成功能的初始化
+// 在文档加载完成后添加开始游戏按钮
 document.addEventListener('DOMContentLoaded', () => {
-    // 隐藏主题选择区域
-    const themeSelection = document.getElementById('themeSelection');
-    if (themeSelection) {
-        themeSelection.classList.add('hidden');
-        // 也可以完全移除
-        // themeSelection.remove();
+    // 创建开始游戏按钮区域
+    const startGameArea = document.createElement('div');
+    startGameArea.className = 'start-game-area';
+    startGameArea.innerHTML = `
+        <div class="start-game-container">
+            <h2>准备开始你的冒险</h2>
+            <p>点击下方按钮，AI将根据你的设定生成完整的故事框架并开始游戏</p>
+            <button id="startGameBtn" class="start-game-btn">
+                <i class="fas fa-play"></i> 开始游戏
+            </button>
+            <div id="startGameLoading" class="start-game-loading hidden">
+                <div class="spinner"></div>
+                <p>AI正在创作你的故事世界...</p>
+                <div id="loadingProgressText" class="loading-progress-text"></div>
+            </div>
+        </div>
+    `;
+    
+    // 将按钮区域插入到故事内容前面
+    const storyContainer = document.querySelector('.story-content');
+    if (storyContainer) {
+        storyContainer.parentNode.insertBefore(startGameArea, storyContainer);
     }
     
-    // 移除主题显示区域
-    const themeDisplayArea = document.querySelector('.selected-theme-container');
-    if (themeDisplayArea) {
-        themeDisplayArea.style.display = 'none';
-    }
+    // 隐藏故事内容和选择区域，直到游戏开始
+    document.querySelector('.story-content').style.display = 'none';
+    document.querySelector('.choices-container').style.display = 'none';
+    document.querySelector('.story-image-container').style.display = 'none';
     
-    initializeGame();
+    // 添加开始游戏按钮的点击事件
+    document.getElementById('startGameBtn').addEventListener('click', startGame);
+    
+    // 其他初始化代码
+    initSaveGameFeature();
     initializeEditFeatures();
     initializeStoryInfoButtons();
-    initializeStoryTreeFeatures(); // 初始化剧情树功能
-    initializeSettingsInfoButton(); // 初始化设定信息按钮
+    initializeStoryTreeFeatures();
+    initializeSettingsInfoButton();
     initializeImageGeneration();
 });
