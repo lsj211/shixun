@@ -27,23 +27,58 @@ const gameState = {
 };
 
 // 新增：用存档内容覆盖gameState
-(function applyArchiveToGameState() {
+// (function applyArchiveToGameState() {
+//     const urlParams = new URLSearchParams(window.location.search);
+//     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
+//     if (archiveKey) {
+//         try {
+//             const gameSettings = JSON.parse(localStorage.getItem(archiveKey));
+//             if (gameSettings) {
+//                 if (gameSettings.background) gameState.storyBackground = gameSettings.background;
+//                 if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
+//                 if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
+//                 if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+//             }
+//         } catch (e) {
+//             console.warn('存档解析失败', e);
+//         }
+//     }
+// })();
+function applyArchiveToGameState() {
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
     if (archiveKey) {
         try {
             const gameSettings = JSON.parse(localStorage.getItem(archiveKey));
             if (gameSettings) {
+                // 这里可以补充更多需要同步的存档字段（原代码可能漏了部分数据）
                 if (gameSettings.background) gameState.storyBackground = gameSettings.background;
                 if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
                 if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
                 if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+                // 补充其他需要同步的字段（比如之前存档数据中的 meta、progress 等）
+                if (gameSettings.meta) {
+                    gameState.currentChapter = gameSettings.meta.currentChapter || gameState.currentChapter;
+                    gameState.gameCompleted = gameSettings.meta.gameCompleted || false;
+                }
+                if (gameSettings.gameProgress) {
+                    gameState.exploredNodes = new Set(gameSettings.gameProgress.exploredNodes || []);
+                    gameState.currentPath = gameSettings.gameProgress.currentPath || [];
+                    gameState.history = gameSettings.gameProgress.history || [];
+                    // 同步当前节点ID（如果需要）
+                    // currentStoryNode = currentStoryNode || { id: gameSettings.gameProgress.currentNodeId };
+                }
+                console.log('存档已成功应用到游戏状态');
             }
         } catch (e) {
             console.warn('存档解析失败', e);
         }
     }
-})();
+}
+
+// 页面加载时立即执行一次（保留原有的立即执行特性）
+applyArchiveToGameState();
+
 
 
 // 添加更新进度条的函数
@@ -189,6 +224,7 @@ function initializeGame() {
     // 确保初始节点有ID
     if (!currentStoryNode.id) {
         currentStoryNode.id = 'node-1';
+        console.log(111);
     }
     
     // 缓存初始节点 - 新增这一行
@@ -196,7 +232,7 @@ function initializeGame() {
 
     // 记录初始节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
-    gameState.currentPath.push(currentStoryNode.id);
+    // gameState.currentPath.push(currentStoryNode.id);
     
     // 显示初始内容
     updateStoryDisplay(currentStoryNode);
@@ -3380,12 +3416,22 @@ function saveGameToArchive(archiveKey = null) {
     const dateTimeStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
     
     // 生成存档键，格式：archive_标题_YYYYMMDDHHMMSS
+    // if (!archiveKey) {
+    //     // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
+    //     // archiveKey = `archive_${titleBase}_${timeForKey}`;
+    //     // // 替换可能导致问题的字符
+    //     // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+    //     archiveKey = 'gameSettings_' + Date.now();
+    // }
+    const newkey='gameSettings_' + Date.now();
     if (!archiveKey) {
-        // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
-        // archiveKey = `archive_${titleBase}_${timeForKey}`;
-        // // 替换可能导致问题的字符
-        // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
-        archiveKey = 'gameSettings_' + Date.now();
+        archiveKey = localStorage.getItem('gameSettings_current');
+        // const newkey='gameSettings_' + Date.now();
+        console.log('当前存档键:', archiveKey);
+        // // 如果没有当前存档，则使用时间戳创建一个新存档
+        // if (!archiveKey) {
+        //     archiveKey = 'gameSettings_' + Date.now();
+        // }
     }
     console.log(dateTimeStr)
     // 创建分类的存档数据结构
@@ -3468,17 +3514,29 @@ function saveGameToArchive(archiveKey = null) {
     // 保存到 localStorage - 参考 setting.js 的方式
     try {
         // 保存存档数据
-        localStorage.setItem(archiveKey, JSON.stringify(archiveData));
-        localStorage.setItem('gameSettings_current', archiveKey);
-        
+        localStorage.setItem(newkey, JSON.stringify(archiveData));
+        localStorage.setItem('gameSettings_current', newkey);
+
+        // 关键：同步更新 URL 中的 archive 参数
+        const url = new URL(window.location.href);
+        url.searchParams.set('archive', newkey); // 将 URL 参数更新为新存档键
+        history.pushState(null, '', url); // 不刷新页面更新 URL
+        if (archiveKey && archiveKey !== newkey) {
+            localStorage.removeItem(archiveKey); // 删除旧存档
+        }
         // 更新存档列表 - 与 setting.js 中的方式保持一致
         let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-        if (!allKeys.includes(archiveKey)) {
-            allKeys.push(archiveKey);
+        if (archiveKey) {
+            allKeys = allKeys.filter(key => key !== archiveKey);
+        }
+        if (!allKeys.includes(newkey)) {
+            allKeys.push(newkey);
             localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
         }
         
-        console.log('游戏已保存到存档:', archiveKey);
+        console.log('游戏已保存到存档:', newkey);
+        applyArchiveToGameState();
+        initializeGame();
         return true;
     } catch (error) {
         console.error('保存游戏失败:', error);
@@ -4219,12 +4277,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 获取当前存档键
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
-    
+    console.log('当前存档键:', localStorage.getItem('gameSettings_current'));
+    console.log('URL参数存档键:', archiveKey);
     // 检查是否从存档加载游戏且存档中已有游戏内容
     if (archiveKey) {
         try {
             const archiveData = JSON.parse(localStorage.getItem(archiveKey));
-            
+            console.log('加载存档数据:', archiveData);
             // 检查存档是否为分块存储
             if (archiveData && archiveData.isChunked) {
                 // 检查分块存档中是否有游戏进度数据
