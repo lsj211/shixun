@@ -1,128 +1,129 @@
 document.addEventListener('DOMContentLoaded', () => {
-
-
-    // const allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-    // if (allKeys.length > 0) {
-    //     // 创建弹窗
-    //     const modal = document.createElement('div');
-    //     modal.style.position = 'fixed';
-    //     modal.style.top = 0;
-    //     modal.style.left = 0;
-    //     modal.style.width = '100vw';
-    //     modal.style.height = '100vh';
-    //     modal.style.background = 'rgba(0,0,0,0.4)';
-    //     modal.style.display = 'flex';
-    //     modal.style.alignItems = 'center';
-    //     modal.style.justifyContent = 'center';
-    //     modal.style.zIndex = 9999;
-
-    //     const box = document.createElement('div');
-    //     box.style.background = '#fff';
-    //     box.style.padding = '30px 24px';
-    //     box.style.borderRadius = '8px';
-    //     box.style.boxShadow = '0 2px 12px rgba(0,0,0,0.15)';
-    //     box.style.minWidth = '320px';
-    //     box.innerHTML = `
-    //         <h3 style="margin-top:0;">请选择操作</h3>
-    //         <button id="new-archive-btn" style="margin-bottom:16px;width:100%;">新开存档</button>
-    //         <div style="margin:12px 0 8px 0;">或选择以前的设置：</div>
-    //         <select id="archive-select" style="width:100%;margin-bottom:12px;"></select>
-    //         <button id="use-archive-btn" style="width:100%;">使用所选存档</button>
-    //     `;
-    //     modal.appendChild(box);
-    //     document.body.appendChild(modal);
-
-    //     // 填充下拉框
-    //     const select = box.querySelector('#archive-select');
-    //     allKeys.forEach(key => {
-    //         const data = JSON.parse(localStorage.getItem(key) || '{}');
-    //         // 展示存档时间和背景
-    //         const date = new Date(Number(key.replace('gameSettings_', '')));
-    //         const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
-    //         const option = document.createElement('option');
-    //         option.value = key;
-    //         option.textContent = label;
-    //         select.appendChild(option);
-    //     });
-
-    //     // 新开存档
-    //     box.querySelector('#new-archive-btn').onclick = () => {
-    //         document.body.removeChild(modal);
-    //         // 继续后续流程（显示模式选择等）
-    //     };
-
-    //     // 使用旧存档
-    //     box.querySelector('#use-archive-btn').onclick = () => {
-    //         const selectedKey = select.value;
-    //         if (selectedKey) {
-    //             localStorage.setItem('gameSettings_current', selectedKey); // 可选：记录当前存档
-    //             window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
-    //         }
-    //     };
-
-    //     // 阻止后续流程
-    //     return;
-    // }
-
-    // 存档选择区功能
-    const archiveSection = document.getElementById('archive-selection');
-    const archiveSelect = document.getElementById('archive-select');
-    const useArchiveBtn = document.getElementById('use-archive-btn');
-    const newArchiveBtn = document.getElementById('new-archive-btn');
-
-    // 获取所有存档key
-    const allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-
-    // 填充下拉框或显示暂无存档
-    if (allKeys.length > 0) {
-        archiveSection.classList.remove('hidden');
-        archiveSelect.innerHTML = '';
-        allKeys.forEach(key => {
-            const data = JSON.parse(localStorage.getItem(key) || '{}');
-            const date = new Date(Number(key.replace('gameSettings_', '')));
-            const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
-            const option = document.createElement('option');
-            option.value = key;
-            option.textContent = label;
-            archiveSelect.appendChild(option);
-        });
-        useArchiveBtn.disabled = false;
-    } else {
-        archiveSection.classList.remove('hidden');
-        archiveSelect.innerHTML = '';
-        const emptyOption = document.createElement('option');
-        emptyOption.textContent = '暂无存档';
-        emptyOption.disabled = true;
-        emptyOption.selected = true;
-        archiveSelect.appendChild(emptyOption);
-        useArchiveBtn.disabled = true;
-    }
-
-    // 使用所选存档
-    useArchiveBtn.onclick = () => {
-        const selectedKey = archiveSelect.value;
-        if (selectedKey) {
-            localStorage.setItem('gameSettings_current', selectedKey);
-            window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
-        }
-    };
-
-    // 创建新存档
-    newArchiveBtn.onclick = () => {
-        archiveSection.classList.add('hidden');
-        // 显示模式选择区
+        // 模式选择按钮
+        const playModeBtn = document.getElementById('play-mode-btn');
+        const createModeBtn = document.getElementById('create-mode-btn');
         const modeSelection = document.getElementById('mode-selection');
-        if (modeSelection) modeSelection.classList.remove('hidden');
-    };
+        const playModeSettings = document.getElementById('play-mode-settings');
+        const createModeSettings = document.getElementById('create-mode-settings');
+        const archiveSection = document.getElementById('archive-selection');
+        const archiveSelect = document.getElementById('archive-select');
+        const useArchiveBtn = document.getElementById('use-archive-btn');
+        const newArchiveBtn = document.getElementById('new-archive-btn');
 
+        // 当前模式标记
+        let currentMode = '';
 
+        // 初始只显示模式选择区
+        archiveSection.classList.add('hidden');
+        modeSelection.classList.remove('hidden');
+
+        playModeBtn.addEventListener('click', () => {
+            currentMode = 'game';
+            modeSelection.classList.add('hidden');
+            archiveSection.classList.remove('hidden');
+            renderArchiveList();
+        });
+
+        createModeBtn.addEventListener('click', () => {
+            currentMode = 'create';
+            modeSelection.classList.add('hidden');
+            archiveSection.classList.remove('hidden');
+            renderArchiveList();
+        });
+
+        // 渲染存档列表，按模式区分key
+        function renderArchiveList() {
+            let keyName = currentMode === 'game' ? 'gameSettings_keys' : 'creatorSettings_keys';
+            const allKeys = JSON.parse(localStorage.getItem(keyName) || '[]');
+            archiveSelect.innerHTML = '';
+            if (allKeys.length > 0) {
+                archiveSection.classList.remove('hidden');
+                allKeys.forEach(key => {
+                    const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    const date = new Date(Number(key.replace(/.*_/, '')));
+                    const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
+                    const option = document.createElement('option');
+                    option.value = key;
+                    option.textContent = label;
+                    archiveSelect.appendChild(option);
+                });
+                useArchiveBtn.disabled = false;
+                // 添加删除存档按钮（只添加一次）
+                let deleteBtn = document.getElementById('delete-archive-btn');
+                if (!deleteBtn) {
+                    deleteBtn = document.createElement('button');
+                    deleteBtn.id = 'delete-archive-btn';
+                    deleteBtn.textContent = '删除当前存档';
+                    deleteBtn.style.marginLeft = '12px';
+                    useArchiveBtn.parentNode.appendChild(deleteBtn);
+
+                    deleteBtn.onclick = () => {
+                        const selectedKey = archiveSelect.value;
+                        if (selectedKey && confirm('确定要删除该存档吗？')) {
+                            // 删除存档
+                            localStorage.removeItem(selectedKey);
+                            // 更新key列表
+                            let allKeys = JSON.parse(localStorage.getItem(keyName) || '[]');
+                            allKeys = allKeys.filter(k => k !== selectedKey);
+                            localStorage.setItem(keyName, JSON.stringify(allKeys));
+                            // 如果当前存档被删，清除current
+                            const currentKey = currentMode === 'play' ? 'gameSettings_current' : 'creatorSettings_current';
+                            if (localStorage.getItem(currentKey) === selectedKey) {
+                                localStorage.removeItem(currentKey);
+                            }
+                            // 刷新存档列表
+                            renderArchiveList();
+                        }
+                    };
+                } else {
+                    deleteBtn.style.display = '';
+                }
+            } else {
+                archiveSection.classList.remove('hidden');
+                const emptyOption = document.createElement('option');
+                emptyOption.textContent = '暂无存档';
+                emptyOption.disabled = true;
+                emptyOption.selected = true;
+                archiveSelect.appendChild(emptyOption);
+                useArchiveBtn.disabled = true;
+                // 隐藏删除按钮
+                const deleteBtn = document.getElementById('delete-archive-btn');
+                if (deleteBtn) deleteBtn.style.display = 'none';
+            }
+        }
+
+        // 使用所选存档
+        useArchiveBtn.onclick = () => {
+            const selectedKey = archiveSelect.value;
+            if (selectedKey) {
+                if (currentMode === 'play') {
+                    localStorage.setItem('gameSettings_current', selectedKey);
+                    window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
+                } else if (currentMode === 'create') {
+                    localStorage.setItem('creatorSettings_current', selectedKey);
+                    window.location.href = 'create.html?archive=' + encodeURIComponent(selectedKey);
+                }
+            }
+        };
+
+        // 创建新存档
+        newArchiveBtn.onclick = () => {
+            archiveSection.classList.add('hidden');
+            if (currentMode === 'play') {
+                playModeSettings.classList.remove('hidden');
+                initPlayMode(gameSettings);
+            } else if (currentMode === 'create') {
+                createModeSettings.classList.remove('hidden');
+                // 可在此处初始化创作模式
+            }
+        };
 
     // 模式选择按钮
-    const playModeBtn = document.getElementById('play-mode-btn');
-    const createModeBtn = document.getElementById('create-mode-btn');
-    const modeSelection = document.getElementById('mode-selection');
-    const playModeSettings = document.getElementById('play-mode-settings');
-    const createModeSettings = document.getElementById('create-mode-settings');
+    // const playModeBtn = document.getElementById('play-mode-btn');
+    // const createModeBtn = document.getElementById('create-mode-btn');
+    // const modeSelection = document.getElementById('mode-selection');
+    // const playModeSettings = document.getElementById('play-mode-settings');
+    // const createModeSettings = document.getElementById('create-mode-settings');
     
     // 创作模式类型选择
     const textBasedBtn = document.getElementById('text-based-btn');
@@ -143,114 +144,119 @@ document.addEventListener('DOMContentLoaded', () => {
         chapterCount: 5
     };
     
-    // // =================== 模式选择逻辑 ===================
-    playModeBtn.addEventListener('click', () => {
-        modeSelection.classList.add('hidden');
-        playModeSettings.classList.remove('hidden');
-    });
+    // // // =================== 模式选择逻辑 ===================
+    // playModeBtn.addEventListener('click', () => {
+    //     modeSelection.classList.add('hidden');
+    //     playModeSettings.classList.remove('hidden');
+    //     initPlayMode(gameSettings); // 初始化游玩模式
+    // });
     
-    createModeBtn.addEventListener('click', () => {
-        modeSelection.classList.add('hidden');
-        createModeSettings.classList.remove('hidden');
-    });
+    // createModeBtn.addEventListener('click', () => {
+    //     modeSelection.classList.add('hidden');
+    //     createModeSettings.classList.remove('hidden');
+    // });
     
-    // =================== 游玩模式设定步骤逻辑 ===================
-    const playSteps = [
-        document.getElementById('play-step-1'),
-        document.getElementById('play-step-2'),
-        document.getElementById('play-step-3'),
-        document.getElementById('play-step-4')
-    ];
-    
-    // 下一步按钮逻辑
-    playSteps.forEach((step, index) => {
-        if (index < playSteps.length - 1) {
-            const nextBtn = step.querySelector('.next-btn');
-            nextBtn.addEventListener('click', async () => {
-                // 当从第1步进入第2步时，生成角色
-                if (index === 0) {
-                    // 保存背景设定
-                    const backgroundText = document.getElementById('play-story-background').value.trim();
-                    if (!backgroundText) {
-                        alert('请输入故事背景');
-                        return;
+
+
+    // 封装游玩模式初始化为函数
+    function initPlayMode(gameSettings) {
+        // =================== 游玩模式设定步骤逻辑 ===================
+        const playSteps = [
+            document.getElementById('play-step-1'),
+            document.getElementById('play-step-2'),
+            document.getElementById('play-step-3'),
+            document.getElementById('play-step-4')
+        ];
+
+        // 下一步按钮逻辑
+        playSteps.forEach((step, index) => {
+            if (index < playSteps.length - 1) {
+                const nextBtn = step.querySelector('.next-btn');
+                nextBtn.addEventListener('click', async () => {
+                    // 当从第1步进入第2步时，生成角色
+                    if (index === 0) {
+                        // 保存背景设定
+                        const backgroundText = document.getElementById('play-story-background').value.trim();
+                        if (!backgroundText) {
+                            alert('请输入故事背景');
+                            return;
+                        }
+
+                        gameSettings.background = backgroundText;
+
+                        // 尝试自动生成角色
+                        try {
+                            await generateCharactersFromBackground(backgroundText);
+                        } catch (error) {
+                            console.error('角色生成失败:', error);
+                            // 即使生成失败也继续，用户可以手动输入
+                        }
                     }
-                    
-                    gameSettings.background = backgroundText;
-                    
-                    // 尝试自动生成角色
-                    try {
-                        await generateCharactersFromBackground(backgroundText);
-                    } catch (error) {
-                        console.error('角色生成失败:', error);
-                        // 即使生成失败也继续，用户可以手动输入
-                    }
-                }
-                
-                step.classList.add('hidden');
-                playSteps[index + 1].classList.remove('hidden');
-            });
-        }
-    });
-    
-    // 上一步按钮逻辑
-    playSteps.forEach((step, index) => {
-        if (index > 0) {
-            const prevBtn = step.querySelector('.prev-btn');
-            prevBtn.addEventListener('click', () => {
-                step.classList.add('hidden');
-                playSteps[index - 1].classList.remove('hidden');
-            });
-        }
-    });
-    
-    // 章节数滑块逻辑
-    const playChapterCount = document.getElementById('play-chapter-count');
-    const playChapterDisplay = document.getElementById('play-chapter-display');
-    
-    playChapterCount.addEventListener('input', () => {
-        const count = playChapterCount.value;
-        playChapterDisplay.textContent = `${count} 章`;
-        gameSettings.chapterCount = parseInt(count);
-    });
-    
-    // 复杂度选择逻辑
-    const playComplexityOptions = document.getElementsByName('play-complexity');
-    playComplexityOptions.forEach(option => {
-        option.addEventListener('change', () => {
-            if (option.checked) {
-                gameSettings.complexity = option.value;
+
+                    step.classList.add('hidden');
+                    playSteps[index + 1].classList.remove('hidden');
+                });
             }
         });
-    });
-    
-    // 添加角色按钮逻辑
-    const playAddCharacterBtn = document.querySelector('#play-mode-settings .add-character-btn');
-    const playCharactersContainer = document.getElementById('play-characters-container');
-    
-    playAddCharacterBtn.addEventListener('click', () => {
-        addCharacterInput(playCharactersContainer);
-    });
-    
-    // 开始游戏按钮逻辑
-    const startGameBtn = document.querySelector('.start-game-btn');
-    startGameBtn.addEventListener('click', () => {
-        // 收集所有设置
-        collectGameSettings();
 
-        // 生成唯一key（如用时间戳）
-        const key = 'gameSettings_' + Date.now();
-        localStorage.setItem(key, JSON.stringify(gameSettings));
+        // 上一步按钮逻辑
+        playSteps.forEach((step, index) => {
+            if (index > 0) {
+                const prevBtn = step.querySelector('.prev-btn');
+                prevBtn.addEventListener('click', () => {
+                    step.classList.add('hidden');
+                    playSteps[index - 1].classList.remove('hidden');
+                });
+            }
+        });
 
-        // 可选：记录所有key，方便管理
-        let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-        allKeys.push(key);
-        localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
-        // 设置标记，指示这是从设定页面开始的新游戏
-        sessionStorage.setItem('newGameFromSettings', 'true');
-        // 跳转到游戏页面
-        window.location.href = 'game.html';
-    });
+        // 章节数滑块逻辑
+        const playChapterCount = document.getElementById('play-chapter-count');
+        const playChapterDisplay = document.getElementById('play-chapter-display');
+
+        playChapterCount.addEventListener('input', () => {
+            const count = playChapterCount.value;
+            playChapterDisplay.textContent = `${count} 章`;
+            gameSettings.chapterCount = parseInt(count);
+        });
+
+        // 复杂度选择逻辑
+        const playComplexityOptions = document.getElementsByName('play-complexity');
+        playComplexityOptions.forEach(option => {
+            option.addEventListener('change', () => {
+                if (option.checked) {
+                    gameSettings.complexity = option.value;
+                }
+            });
+        });
+
+        // 添加角色按钮逻辑
+        const playAddCharacterBtn = document.querySelector('#play-mode-settings .add-character-btn');
+        const playCharactersContainer = document.getElementById('play-characters-container');
+
+        playAddCharacterBtn.addEventListener('click', () => {
+            addCharacterInput(playCharactersContainer);
+        });
+
+        // 开始游戏按钮逻辑
+        const startGameBtn = document.querySelector('.start-game-btn');
+        startGameBtn.addEventListener('click', () => {
+            // 收集所有设置
+            collectGameSettings();
+
+            // 生成唯一key（如用时间戳）
+            const key = 'gameSettings_' + Date.now();
+            localStorage.setItem(key, JSON.stringify(gameSettings));
+
+            // 可选：记录所有key，方便管理
+            let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+            allKeys.push(key);
+            localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+
+            // 跳转到游戏页面
+            window.location.href = 'game.html?archive=' + encodeURIComponent(key);
+        });
+    }
     
 
 
