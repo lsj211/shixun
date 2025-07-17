@@ -3320,12 +3320,13 @@ function saveGameToArchive(archiveKey = null) {
     
     // 生成存档键，格式：archive_标题_YYYYMMDDHHMMSS
     if (!archiveKey) {
-        const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
-        archiveKey = `archive_${titleBase}_${timeForKey}`;
-        // 替换可能导致问题的字符
-        archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+        // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
+        // archiveKey = `archive_${titleBase}_${timeForKey}`;
+        // // 替换可能导致问题的字符
+        // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+        archiveKey = 'gameSettings_' + Date.now();
     }
-    
+    console.log(dateTimeStr)
     // 创建分类的存档数据结构
     const archiveData = {
         // 基本信息
@@ -3339,7 +3340,6 @@ function saveGameToArchive(archiveKey = null) {
             gameCompleted: gameState.gameCompleted || false,
             version: '1.0'
         },
-        
         // 世界观背景数据
         background: gameState.storyBackground || "",
         generatedBackground: gameState.generatedBackground || "",
@@ -3363,9 +3363,10 @@ function saveGameToArchive(archiveKey = null) {
         // 故事节点数据
         storyNodes: {}
     };
-    
+    console.log('存档数据:', archiveData);
     // 收集所有已探索节点的完整数据
     if (gameState.exploredNodes && gameState.exploredNodes.size > 0) {
+        console.log('已探索节点:', gameState.exploredNodes);
         Array.from(gameState.exploredNodes).forEach(nodeId => {
             const nodeData = findExistingNodeData(nodeId);
             if (nodeData) {
@@ -3382,7 +3383,7 @@ function saveGameToArchive(archiveKey = null) {
             }
         });
     }
-    
+    console.log('存档数据已准备:', archiveData.storyNodes);
     // 保存到 localStorage - 参考 setting.js 的方式
     try {
         // 保存存档数据
@@ -3544,6 +3545,9 @@ function loadGameFromArchive(archiveKey) {
             
             // 恢复当前节点
             const currentNodeId = archiveData.gameProgress.currentNodeId;
+            console.log(archiveData)
+            console.log('当前节点ID:', currentNodeId);
+            console.log('故事节点数据:', archiveData.storyNodes);
             if (currentNodeId && archiveData.storyNodes && archiveData.storyNodes[currentNodeId]) {
                 currentStoryNode = archiveData.storyNodes[currentNodeId];
             } else {

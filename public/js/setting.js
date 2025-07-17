@@ -40,7 +40,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 archiveSection.classList.remove('hidden');
                 allKeys.forEach(key => {
                     const data = JSON.parse(localStorage.getItem(key) || '{}');
+                    console.log(key)
                     const date = new Date(Number(key.replace(/.*_/, '')));
+                    // console.log(data)
                     const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
                     const option = document.createElement('option');
                     option.value = key;
@@ -143,18 +145,6 @@ document.addEventListener('DOMContentLoaded', () => {
         complexity: 'medium',
         chapterCount: 5
     };
-    
-    // // // =================== 模式选择逻辑 ===================
-    // playModeBtn.addEventListener('click', () => {
-    //     modeSelection.classList.add('hidden');
-    //     playModeSettings.classList.remove('hidden');
-    //     initPlayMode(gameSettings); // 初始化游玩模式
-    // });
-    
-    // createModeBtn.addEventListener('click', () => {
-    //     modeSelection.classList.add('hidden');
-    //     createModeSettings.classList.remove('hidden');
-    // });
     
 
 
