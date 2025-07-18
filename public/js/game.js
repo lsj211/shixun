@@ -1,5 +1,6 @@
 // 修改游戏状态，添加已探索节点记录
 const gameState = {
+    title:"",
     storyBackground: "",
     characters: [],
     currentChapter: 1,
@@ -38,6 +39,20 @@ const gameState = {
                 if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
                 if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
                 if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+                if (gameSettings.title) gameState.title = gameSettings.title;
+                // 补充其他需要同步的字段（比如之前存档数据中的 meta、progress 等）
+                if (gameSettings.meta) {
+                    gameState.currentChapter = gameSettings.meta.currentChapter || gameState.currentChapter;
+                    gameState.gameCompleted = gameSettings.meta.gameCompleted || false;
+                }
+                if (gameSettings.gameProgress) {
+                    gameState.exploredNodes = new Set(gameSettings.gameProgress.exploredNodes || []);
+                    gameState.currentPath = gameSettings.gameProgress.currentPath || [];
+                    gameState.history = gameSettings.gameProgress.history || [];
+                    // 同步当前节点ID（如果需要）
+                    // currentStoryNode = currentStoryNode || { id: gameSettings.gameProgress.currentNodeId };
+                }
+                console.log('存档已成功应用到游戏状态');
             }
         } catch (e) {
             console.warn('存档解析失败', e);
@@ -212,6 +227,9 @@ function initializeGame() {
 
 // 更新故事显示
 function updateStoryDisplay(node) {
+    //更新小说标题
+    document.getElementById('storyTitle').textContent = gameState.title;
+
     // 更新标题
     document.getElementById('currentStageTitle').textContent = node.title;
     // 更新内容
@@ -3270,9 +3288,15 @@ async function startGame() {
         // 调用API生成故事大纲
         const outlineResponse = await generateStoryOutline(gameData);
         
+        
         // 保存大纲到游戏状态
         gameState.storyOutline = outlineResponse.outline;
         
+        const storytitle=await generateStoryTitle(gameState);
+
+        // 保存标题到游戏状态
+        gameState.title= storytitle.title;
+
         // 更新加载状态文本
         updateLoadingText('正在创作第一章内容...');
         
@@ -3357,6 +3381,29 @@ async function generateStoryOutline(gameData) {
     
     return await response.json();
 }
+
+
+// 生成小说标题
+async function generateStoryTitle(gameState) {
+    console.log(gameState)
+    // 请求后台API生成大纲
+    const response = await fetch('/api/generate-story-title', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            outline: gameState.storyOutline, // 从游戏状态中提取完整大纲
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error('标题生成失败');
+    }
+    
+    return await response.json();
+}
+
 
 // 生成第一章内容
 async function generateFirstChapter(gameData, outline) {
@@ -3542,6 +3589,8 @@ function saveGameToArchive(archiveKey = null) {
         
         // 故事大纲
         storyOutline: gameState.storyOutline || "",
+
+        title: gameState.title || "无标题",
         
         // 游戏进度数据
         gameProgress: {
@@ -3644,7 +3693,8 @@ function saveGameInChunks(archiveKey, archiveData) {
         // 3. 保存角色和大纲
         const chunk3 = {
             characters: archiveData.characters,
-            storyOutline: archiveData.storyOutline
+            storyOutline: archiveData.storyOutline,
+            title: archiveData.title || "无标题"
         };
         localStorage.setItem(`${baseKey}_3`, JSON.stringify(chunk3));
         
@@ -3731,6 +3781,7 @@ function loadGameFromArchive(archiveKey) {
             gameState.settings.chapterCount = archiveData.meta.chapterCount || 5;
             gameState.currentChapter = archiveData.meta.currentChapter || 1;
             gameState.gameCompleted = archiveData.meta.gameCompleted || false;
+            
         }
         
         // 加载世界观背景
@@ -3744,6 +3795,9 @@ function loadGameFromArchive(archiveKey) {
         
         // 加载故事大纲
         gameState.storyOutline = archiveData.storyOutline || "";
+
+        //加载标题
+        gameState.title = archiveData.title || "无标题";
         
         // 加载游戏进度
         if (archiveData.gameProgress) {
@@ -3917,8 +3971,9 @@ function initSaveGameFeature() {
     // 添加自动保存功能（每5分钟自动保存一次）
     setInterval(() => {
         // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
-        const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
-        saveGameToArchive(autoSaveName);
+        // const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
+        // saveGameToArchive(autoSaveName);
+        saveGameToArchive();
         console.log('游戏已自动保存');
     }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
     
@@ -4385,7 +4440,15 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelector('.story-content').style.display = 'none';
     document.querySelector('.choices-container').style.display = 'none';
     document.querySelector('.story-image-container').style.display = 'none';
-    
+
+    // 2. 更新DOM
+    const titleElem = document.getElementById('storyTitle');
+    if (!titleElem) {
+        console.error("未找到#storyTitle元素！");
+        return;
+    }
+
+        titleElem.textContent = gameState?.storyOutline?.title ;
     // 添加开始游戏按钮的点击事件
     document.getElementById('startGameBtn').addEventListener('click', startGame);
     

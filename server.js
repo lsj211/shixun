@@ -1,3 +1,4 @@
+const { createHash } = require('crypto'); // 顶部导入
 require('dotenv').config();
 const express = require('express');
 const mysql = require('mysql2/promise');
@@ -242,6 +243,52 @@ app.post('/api/generate-story-outline', (req, res) => {
         console.error('读取缓存失败:', err);
         streamProxyToPython(req, res, '/api/generate-story-outline');
     });
+});
+
+//生成标题
+app.post('/api/generate-story-title', async (req, res) => {
+    try {
+        // 从请求体中获取参数
+        const { outline } = req.body;
+        
+        // 创建缓存键（使用大纲的前50个字符的哈希值）
+        // const cacheKey = `title_${hashlib.md5(outline.substring(0, 50).encode()).hexdigest()}`;
+        const cacheKey = `title_${createHash('md5').update(outline.substring(0, 50)).digest('hex')}`;
+        
+        // 检查缓存
+        const cachedTitle = await getFromCache(cacheKey);
+        if (cachedTitle) {
+            return res.json({ title: cachedTitle });
+        }
+        
+        // 转发请求到Python后端
+        try {
+            const pythonResponse = await axios.post(`${PYTHON_API_URL}/api/generate-story-title`, req.body);
+            
+            // 检查响应格式是否正确
+            if (pythonResponse.data && pythonResponse.data.title) {
+                // 保存到缓存
+                await saveToCache(cacheKey, pythonResponse.data.title);
+                
+                // 返回成功响应
+                return res.json({ title: pythonResponse.data.title });
+            } else {
+                console.error('Python后端返回格式异常:', pythonResponse.data);
+                return res.status(500).json({ error: 'Python后端返回数据异常' });
+            }
+        } catch (apiError) {
+            console.error('Python后端请求失败:', apiError.message);
+            
+            // 区分不同类型的错误
+            const statusCode = apiError.response?.status || 500;
+            const errorMessage = apiError.response?.data?.error || 'Python后端请求失败';
+            
+            return res.status(statusCode).json({ error: errorMessage });
+        }
+    } catch (error) {
+        console.error('生成标题失败:', error);
+        res.status(500).json({ error: error.message || '生成标题失败' });
+    }
 });
 
 // 添加章节内容生成API代理
