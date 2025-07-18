@@ -370,9 +370,11 @@ function handleChoiceClick(event) {
 
     // 新增：根据大纲、当前剧情和选项内容生成下一段剧情
     generateNextContentFromAPI(currentChoice).then(newContent => {
+
+        console.log("当前节点:", currentStoryNode);
         // 增加章节和场景信息
-        newContent.chapter = calculateNextChapter(currentStoryNode);
-        newContent.scene = calculateNextScene(currentStoryNode);
+        // newContent.chapter = calculateNextChapter(currentStoryNode);
+        // newContent.scene = calculateNextScene(currentStoryNode);
         
         // 更新故事显示
         updateStoryWithNewContent(newContent);
@@ -410,7 +412,9 @@ function calculateNextChapter(currentNode) {
     
     // 根据复杂度确定每章幕数
     const scenesPerChapter = getSceneCountByComplexity(complexity);
-    
+    console.log(`当前复杂度: ${complexity}, 每章幕数: ${scenesPerChapter}`);
+    console.log(currentNode.scene);
+    console.log(currentNode.chapter);
     // 如果没有章节信息，返回第一章
     if (!currentNode.chapter) return 1;
     
@@ -449,9 +453,14 @@ async function generateNextContentFromAPI(choice) {
         const chapterCount = gameState.settings.chapterCount || 5;
         
         // 计算下一幕和下一章
-        let nextChapter = currentStoryNode.chapter || 1;
-        let nextScene = (currentStoryNode.scene || 1) + 1;
-        
+        let nextChapter = calculateNextChapter(currentStoryNode);
+        let nextScene = calculateNextScene(currentStoryNode);
+        // let nextChapter = currentStoryNode.chapter || 1;
+        // let nextScene = (currentStoryNode.scene || 1);
+        console.log(currentStoryNode);
+        console.log(currentStoryNode.scene);
+        console.log(`当前章节: ${nextChapter}, 当前场景: ${nextScene}, 每章幕数: ${scenesPerChapter}`);
+
         // 检查是否需要进入下一章
         let isChapterFinale = false;
         if (nextScene > scenesPerChapter) {
@@ -508,7 +517,7 @@ async function generateNextContentFromAPI(choice) {
         const data = await response.json();
         
         // 返回处理后的内容
-        return {
+        const nextStoryNode={
             id: 'node-' + Date.now(),
             title: data.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
             content: data.content,
@@ -517,6 +526,9 @@ async function generateNextContentFromAPI(choice) {
             chapter: nextChapter,
             scene: nextScene
         };
+        console.log("生成的下一段剧情:", nextStoryNode);
+        currentStoryNode=nextStoryNode;
+        return nextStoryNode;
     } catch (error) {
         console.error('通过API生成下一段剧情失败:', error);
         throw error;
@@ -545,7 +557,7 @@ function calculateNextScene(currentNode) {
 function updateStoryWithExistingNode(node) {
     // 记住当前节点ID作为父节点ID
     const parentNodeId = currentStoryNode.id;
-    
+    console.log(99999999999);
     // 更新当前节点
     currentStoryNode = {
         id: node.id,
@@ -703,21 +715,25 @@ function generateSpecificChoices(currentContent, keywords) {
 // 修改更新故事内容的函数，记录新节点ID和路径，维护父子关系
 function updateStoryWithNewContent(newContent) {
     // 记住当前节点ID作为父节点ID
-    const parentNodeId = currentStoryNode.id;
+    // const parentNodeId = currentStoryNode.id;
     
-    // 生成新节点ID (如果没有的话)
-    if (!newContent.id) {
-        newContent.id = 'node-' + Date.now();
-    }
+    // // 生成新节点ID (如果没有的话)
+    // if (!newContent.id) {
+    //     newContent.id = 'node-' + Date.now();
+    // }
     
-    // 更新当前节点
-    currentStoryNode = {
-        id: newContent.id,
-        title: newContent.title,
-        content: newContent.content,
-        choices: newContent.choices,
-        parentId: parentNodeId  // 重要：记录父节点关系
-    };
+    // // 更新当前节点
+    // currentStoryNode = {
+    //     id: newContent.id,
+    //     title: newContent.title,
+    //     content: newContent.content,
+    //     choices: newContent.choices,
+    //     parentId: parentNodeId  // 重要：记录父节点关系
+    
+    // };
+
+    const parentNodeId = currentStoryNode.parentId;
+    console.log("更新后的当前节点:", currentStoryNode);
 
     // 缓存新节点数据 - 新增这一行
     cacheNodeData(currentStoryNode);
@@ -3308,15 +3324,18 @@ async function startGame() {
         // 更新加载状态文本
         updateLoadingText('正在生成场景图像...');
         
+        const beginid='node-' + Date.now();
         // 更新当前节点
         currentStoryNode = {
-            id: 'chapter-1-scene-1',
+            id: beginid,
             title: chapterResponse.title,
             content: chapterResponse.content,
             choices: chapterResponse.choices,
             chapter: 1,
             scene: 1
         };
+        
+        updateStoryTreeStructure(null, currentStoryNode);
         
         // 缓存初始节点 - 新增这一行
         cacheNodeData(currentStoryNode);
@@ -3992,14 +4011,14 @@ function initSaveGameFeature() {
         }
     });
     
-    // 添加自动保存功能（每5分钟自动保存一次）
-    setInterval(() => {
-        // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
-        // const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
-        // saveGameToArchive(autoSaveName);
-        saveGameToArchive();
-        console.log('游戏已自动保存');
-    }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
+    // // 添加自动保存功能（每5分钟自动保存一次）
+    // setInterval(() => {
+    //     // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
+    //     // const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
+    //     // saveGameToArchive(autoSaveName);
+    //     // saveGameToArchive();
+    //     // console.log('游戏已自动保存');
+    // }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
     
     // 获取已有的加载进度按钮
     const loadBtn = document.querySelector('.load-btn');
@@ -4428,7 +4447,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 获取当前存档键
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
-    
+    console.log( urlParams.get('archive'));
+    console.log(localStorage.getItem('gameSettings_current'));
     // 检查是否从存档加载游戏且存档中已有游戏内容
     if (archiveKey) {
         try {
