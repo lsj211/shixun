@@ -71,7 +71,7 @@ else:
 try:
     chat_model = ChatTongyi(
         api_key=DASHSCOPE_API_KEY,
-        model_name="qwen-turbo",
+        model_name="qwen-max",
         temperature=0.7,
         top_p=0.8,
         max_tokens=1500,

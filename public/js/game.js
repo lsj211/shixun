@@ -28,7 +28,7 @@ const gameState = {
 };
 
 // 新增：用存档内容覆盖gameState
-(function applyArchiveToGameState() {
+function applyArchiveToGameState() {
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
     if (archiveKey) {
@@ -58,7 +58,9 @@ const gameState = {
             console.warn('存档解析失败', e);
         }
     }
-})();
+}
+
+applyArchiveToGameState();
 
 
 // 添加更新进度条的函数
@@ -200,7 +202,7 @@ let currentStoryNode = storyContent.opening;
 
 // 修改初始化游戏函数，确保初始节点被记录
 function initializeGame() {
-    currentStoryNode.content = gameState.storyBackground;
+    // currentStoryNode.content = gameState.storyBackground;
     // 确保初始节点有ID
     if (!currentStoryNode.id) {
         currentStoryNode.id = 'node-1';
@@ -211,7 +213,7 @@ function initializeGame() {
 
     // 记录初始节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
-    gameState.currentPath.push(currentStoryNode.id);
+    // gameState.currentPath.push(currentStoryNode.id);
     
     // 显示初始内容
     updateStoryDisplay(currentStoryNode);
@@ -3557,12 +3559,22 @@ function saveGameToArchive(archiveKey = null) {
     const dateTimeStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
     
     // 生成存档键，格式：archive_标题_YYYYMMDDHHMMSS
+    // if (!archiveKey) {
+    //     // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
+    //     // archiveKey = `archive_${titleBase}_${timeForKey}`;
+    //     // // 替换可能导致问题的字符
+    //     // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+    //     archiveKey = 'gameSettings_' + Date.now();
+    // }
+    const newkey='gameSettings_' + Date.now();
     if (!archiveKey) {
-        // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
-        // archiveKey = `archive_${titleBase}_${timeForKey}`;
-        // // 替换可能导致问题的字符
-        // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
-        archiveKey = 'gameSettings_' + Date.now();
+        archiveKey = localStorage.getItem('gameSettings_current');
+        // const newkey='gameSettings_' + Date.now();
+        console.log('当前存档键:', archiveKey);
+        // // 如果没有当前存档，则使用时间戳创建一个新存档
+        // if (!archiveKey) {
+        //     archiveKey = 'gameSettings_' + Date.now();
+        // }
     }
     console.log(dateTimeStr)
     // 创建分类的存档数据结构
@@ -3586,11 +3598,9 @@ function saveGameToArchive(archiveKey = null) {
         
         // 角色数据
         characters: gameState.characters || [],
-        
+        title: gameState.title || "无标题",
         // 故事大纲
         storyOutline: gameState.storyOutline || "",
-
-        title: gameState.title || "无标题",
         
         // 游戏进度数据
         gameProgress: {
@@ -3647,17 +3657,29 @@ function saveGameToArchive(archiveKey = null) {
     // 保存到 localStorage - 参考 setting.js 的方式
     try {
         // 保存存档数据
-        localStorage.setItem(archiveKey, JSON.stringify(archiveData));
-        localStorage.setItem('gameSettings_current', archiveKey);
-        
+        localStorage.setItem(newkey, JSON.stringify(archiveData));
+        localStorage.setItem('gameSettings_current', newkey);
+
+        // 关键：同步更新 URL 中的 archive 参数
+        const url = new URL(window.location.href);
+        url.searchParams.set('archive', newkey); // 将 URL 参数更新为新存档键
+        history.pushState(null, '', url); // 不刷新页面更新 URL
+        if (archiveKey && archiveKey !== newkey) {
+            localStorage.removeItem(archiveKey); // 删除旧存档
+        }
         // 更新存档列表 - 与 setting.js 中的方式保持一致
         let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-        if (!allKeys.includes(archiveKey)) {
-            allKeys.push(archiveKey);
+        if (archiveKey) {
+            allKeys = allKeys.filter(key => key !== archiveKey);
+        }
+        if (!allKeys.includes(newkey)) {
+            allKeys.push(newkey);
             localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
         }
         
-        console.log('游戏已保存到存档:', archiveKey);
+        console.log('游戏已保存到存档:', newkey);
+        applyArchiveToGameState();
+        initializeGame();
         return true;
     } catch (error) {
         console.error('保存游戏失败:', error);
@@ -3669,6 +3691,8 @@ function saveGameToArchive(archiveKey = null) {
         return false;
     }
 }
+
+
 
 // 修改分块保存函数，确保使用相同的命名逻辑
 function saveGameInChunks(archiveKey, archiveData) {
@@ -4409,7 +4433,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (archiveKey) {
         try {
             const archiveData = JSON.parse(localStorage.getItem(archiveKey));
-            
+            console.log('加载存档数据:', archiveData);
             // 检查存档是否为分块存储
             if (archiveData && archiveData.isChunked) {
                 // 检查分块存档中是否有游戏进度数据
