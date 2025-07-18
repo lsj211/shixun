@@ -759,6 +759,143 @@ def format_characters(characters):
     
     return "\n".join(result)
 
+# 定义生成下一场景的请求模型
+class NextSceneRequest(BaseModel):
+    background: str
+    timeline: List[Dict[str, str]] = []
+    locations: List[Dict[str, str]] = []
+    characters: List[Dict[str, Any]] = []
+    complexity: str = "medium"
+    chapterNumber: int = 1
+    sceneNumber: int = 1
+    chapterCount: int = 5  # 添加章节总数字段
+    scenesPerChapter: int = 3  # 添加每章场景数字段
+    outline: str = ""
+    currentContent: str = ""
+    selectedChoice: Dict[str, str] = {}
+    isChapterFinale: bool = False  # 添加章节结尾标记
+
+@app.post("/api/generate-next-scene")
+async def generate_next_scene(request: NextSceneRequest):
+    """根据当前剧情和选择生成下一场景"""
+    # 记录请求信息以便调试
+    print(f"收到生成下一场景请求: chapter={request.chapterNumber}, scene={request.sceneNumber}, complexity={request.complexity}")
+    
+    # 创建缓存键
+    choice_text = request.selectedChoice.get("text", "")[:20]
+    cache_key = f"next_scene_{request.chapterNumber}_{request.sceneNumber}_{choice_text}"
+    
+    # 检查缓存
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        return cached_content
+    
+    # 确定章节结构信息
+    scenes_per_chapter = request.scenesPerChapter if hasattr(request, 'scenesPerChapter') else get_scenes_per_complexity(request.complexity)
+    is_chapter_finale = request.isChapterFinale if hasattr(request, 'isChapterFinale') else (request.sceneNumber >= scenes_per_chapter)
+    chapter_count = request.chapterCount if hasattr(request, 'chapterCount') else 5
+    
+    # 构建提示模板，增加章节结构相关指导
+    system_template = (
+        "你是一位专业的交互式小说作家。请根据当前剧情内容和用户的选择，"
+        f"创作第{request.chapterNumber}章第{request.sceneNumber}场景的具体内容。\n\n"
+        f"基于{request.complexity}复杂度，整个故事被划分为{chapter_count}章，"
+        f"每章包含{scenes_per_chapter}个场景。"
+        f"当前你正在创作第{request.chapterNumber}章第{request.sceneNumber}场景，"
+        f"{'这是本章的最后一个场景，需要为下一章做铺垫' if is_chapter_finale else '这不是本章的最后一个场景，需保持剧情连贯性'}\n\n"
+        "请遵循以下要求：\n"
+        "1. 内容应与当前剧情和用户选择保持连贯性\n"
+        "2. 场景应该有生动的描述和角色互动\n"
+        f"3. {'由于这是章节结尾，请设计具有转折性或悬念的剧情，并提供2-3个能引导故事进入下一章的选择' if is_chapter_finale else '请设计2-3个有意义的选择，能够推动剧情向不同方向发展'}\n"
+        "4. 每个选择应包含简短的效果提示\n"
+        "5. 章节标题应该简洁有吸引力\n"
+        f"6. 按照{request.complexity}级别的复杂度设计场景和对话\n\n"
+        "返回JSON格式：\n"
+        "{\n"
+        '  "title": "第X章：章节标题",\n'
+        '  "content": "详细的场景描述和对话内容...",\n'
+        '  "choices": [\n'
+        '    {"text": "选择1文本", "effect": "选择1效果", "nextContent": "选择1后的简短内容预览"},\n'
+        '    {"text": "选择2文本", "effect": "选择2效果", "nextContent": "选择2后的简短内容预览"},\n'
+        '    {"text": "选择3文本", "effect": "选择3效果", "nextContent": "选择3后的简短内容预览"}\n'
+        '  ]\n'
+        "}"
+    )
+    
+    human_template = (
+        f"世界背景：{request.background}\n\n"
+        f"前情提要：\n{format_timeline(request.timeline)}\n\n"
+        f"重要地点：\n{format_locations(request.locations)}\n\n"
+        f"角色信息：\n{format_characters(request.characters)}\n\n"
+        f"故事大纲：\n{request.outline}\n\n"
+        f"当前剧情内容：\n{request.currentContent}\n\n"
+        f"用户的选择：\n"
+        f"选择文本：{request.selectedChoice.get('text', '')}\n"
+        f"选择效果：{request.selectedChoice.get('effect', '')}\n"
+        f"选择后内容预览：{request.selectedChoice.get('nextContent', '')}\n\n"
+        f"当前任务：请创作第{request.chapterNumber}章第{request.sceneNumber}场景的详细内容，"
+        f"要与用户的选择保持一致并自然延续，同时按照要求提供章节标题、详细内容和2-3个新的选择。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        
+        # 尝试解析JSON响应
+        content = response.content
+        
+        # 处理可能的多行JSON格式问题
+        try:
+            result = json.loads(content)
+        except:
+            # 尝试提取JSON部分
+            json_match = re.search(r'(\{[\s\S]*\})', content)
+            if json_match:
+                try:
+                    result = json.loads(json_match.group(1))
+                except:
+                    # 如果仍然失败，则构造一个基本结构
+                    result = {
+                        "title": f"第{request.chapterNumber}章：新的发展",
+                        "content": content,
+                        "choices": [
+                            {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
+                            {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
+                        ]
+                    }
+            else:
+                # 构造一个基本结构
+                result = {
+                    "title": f"第{request.chapterNumber}章：新的发展",
+                    "content": content,
+                    "choices": [
+                        {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
+                        {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
+                    ]
+                }
+        
+        # 保存到缓存
+        save_to_cache(cache_key, result)
+        
+        return result
+    except Exception as e:
+        print(f"生成下一场景失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成下一场景失败: {str(e)}")
+
+# 新增：根据复杂度获取场景数
+def get_scenes_per_complexity(complexity: str) -> int:
+    """根据复杂度返回每章的场景数"""
+    if complexity == "simple":
+        return 2
+    elif complexity == "complex":
+        return 4
+    else:  # medium 或其他
+        return 3
+    
 # 启动服务器（开发环境）
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
