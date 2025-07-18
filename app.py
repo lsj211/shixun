@@ -1,8 +1,3 @@
-import jieba
-import jieba.posseg as pseg
-from collections import Counter
-from typing import List
-import hashlib
 import os
 import json
 import time
@@ -20,12 +15,11 @@ try:
 except ImportError:
     print("警告: python-dotenv 未安装，尝试直接使用环境变量")
 
-import nltk
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from langchain_community.chat_models.tongyi import ChatTongyi
 from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -436,8 +430,7 @@ async def root():
         "endpoints": [
             "/api/generate-background",
             "/api/generate-characters",
-            "/api/generate-story-node",
-            "/api/generate-story-title"
+            "/api/generate-story-node"
         ]
     }
 
@@ -521,110 +514,6 @@ async def generate_story_outline(request: StoryOutlineRequest):
     except Exception as e:
         print(f"生成大纲失败: {e}")
         raise HTTPException(status_code=500, detail=f"生成大纲失败: {str(e)}")
-    
-
-
-class StoryTitleRequest(BaseModel):
-    """生成小说标题的请求模型"""
-    outline: str = Field(..., description="完整的故事大纲文本")
-
-# 生成小说题目API
-@app.post("/api/generate-story-title")
-async def generate_story_title(request: StoryTitleRequest):
-    """根据故事大纲生成小说题目"""
-    # 创建缓存键
-    cache_key = f"title_{hashlib.md5(request.outline[:100].encode()).hexdigest()}"
-    
-    # 检查缓存
-    cached_title = get_from_cache(cache_key)
-    if cached_title:
-        return {"title": cached_title}
-    
-    # 从大纲中提取关键信息
-    main_themes = extract_themes_from_outline(request.outline)
-    tone = analyze_tone(request.outline)
-    genre = infer_genre(request.outline)
-    
-    # 提取主要主题
-    themes_text = ", ".join(main_themes[:3]) if main_themes else "故事"
-    
-    # 构建提示模板
-    system_template = (
-        "你是一位富有创意的小说标题设计师。根据提供的故事大纲，创作一个吸引人的小说标题。\n\n"
-        "标题应符合以下要求：\n"
-        "1. 反映故事的核心主题或主要情节\n"
-        "2. 与故事的基调(如悬疑/奇幻/爱情)相匹配\n"
-        "3. 具有一定的吸引力和独特性\n"
-        "4. 长度适中(5-15个字为宜)\n\n"
-        "返回格式：\n"
-        "主标题 | 副标题(如果有)"
-    )
-    
-    human_template = (
-        f"故事大纲：{request.outline[:500]}...\n\n"
-        f"从大纲中提取的主题：{themes_text}\n"
-        f"推断的故事基调：{tone}\n"
-        f"推断的故事类型：{genre}\n\n"
-        f"请为这个故事创作一个合适的标题。"
-    )
-    
-    messages = [
-        SystemMessage(content=system_template),
-        HumanMessage(content=human_template)
-    ]
-    
-    try:
-        response = await chat_model.ainvoke(messages)
-        title = response.content.strip()
-        
-        # 保存到缓存
-        save_to_cache(cache_key, title)
-        
-        return {"title": title}
-    except Exception as e:
-        print(f"生成标题失败: {e}")
-        raise HTTPException(status_code=500, detail=f"生成标题失败: {str(e)}")
-
-# 辅助函数：从大纲中提取主题
-def extract_themes_from_outline(outline: str) -> List[str]:
-    # 使用 jieba 分词并进行词性标注
-    words = pseg.cut(outline)
-    # 提取名词（n: 名词, nr: 人名, ns: 地名, nt: 机构团体, nz: 其他专有名词）
-    nouns = [word for word, flag in words if flag.startswith('n')]
-    # 统计词频
-    freq_dist = Counter(nouns)
-    # 返回出现频率最高的前5个主题词
-    return [word for word, freq in freq_dist.most_common(5)]
-
-# 辅助函数：分析大纲的基调
-def analyze_tone(outline: str) -> str:
-    # 简单实现：基于关键词判断基调
-    if "神秘" in outline or "悬疑" in outline or "谜题" in outline:
-        return "悬疑"
-    elif "爱情" in outline or "浪漫" in outline or "心动" in outline:
-        return "爱情"
-    elif "冒险" in outline or "旅程" in outline or "探索" in outline:
-        return "冒险"
-    elif "战争" in outline or "对抗" in outline or "危机" in outline:
-        return "紧张"
-    else:
-        return "普通"
-
-# 辅助函数：推断故事类型
-def infer_genre(outline: str) -> str:
-    # 简单实现：基于关键词判断类型
-    if "魔法" in outline or "奇幻" in outline or "神话" in outline:
-        return "奇幻"
-    elif "未来" in outline or "科技" in outline or "机器人" in outline:
-        return "科幻"
-    elif "古代" in outline or "王朝" in outline or "武侠" in outline:
-        return "历史/武侠"
-    elif "校园" in outline or "青春" in outline or "学生" in outline:
-        return "青春"
-    else:
-        return "通用"    
-
-  
 
 # 生成章节内容API
 @app.post("/api/generate-chapter")
@@ -768,13 +657,19 @@ class NextSceneRequest(BaseModel):
     complexity: str = "medium"
     chapterNumber: int = 1
     sceneNumber: int = 1
+    chapterCount: int = 5  # 添加章节总数字段
+    scenesPerChapter: int = 3  # 添加每章场景数字段
     outline: str = ""
     currentContent: str = ""
     selectedChoice: Dict[str, str] = {}
+    isChapterFinale: bool = False  # 添加章节结尾标记
 
 @app.post("/api/generate-next-scene")
 async def generate_next_scene(request: NextSceneRequest):
     """根据当前剧情和选择生成下一场景"""
+    # 记录请求信息以便调试
+    print(f"收到生成下一场景请求: chapter={request.chapterNumber}, scene={request.sceneNumber}, complexity={request.complexity}")
+    
     # 创建缓存键
     choice_text = request.selectedChoice.get("text", "")[:20]
     cache_key = f"next_scene_{request.chapterNumber}_{request.sceneNumber}_{choice_text}"
@@ -785,14 +680,15 @@ async def generate_next_scene(request: NextSceneRequest):
         return cached_content
     
     # 确定章节结构信息
-    is_chapter_finale = request.sceneNumber >= get_scenes_per_complexity(request.complexity)
-    scenes_per_chapter = get_scenes_per_complexity(request.complexity)
+    scenes_per_chapter = request.scenesPerChapter if hasattr(request, 'scenesPerChapter') else get_scenes_per_complexity(request.complexity)
+    is_chapter_finale = request.isChapterFinale if hasattr(request, 'isChapterFinale') else (request.sceneNumber >= scenes_per_chapter)
+    chapter_count = request.chapterCount if hasattr(request, 'chapterCount') else 5
     
     # 构建提示模板，增加章节结构相关指导
     system_template = (
         "你是一位专业的交互式小说作家。请根据当前剧情内容和用户的选择，"
         f"创作第{request.chapterNumber}章第{request.sceneNumber}场景的具体内容。\n\n"
-        f"基于{request.complexity}复杂度，整个故事被划分为{request.chapterCount}章，"
+        f"基于{request.complexity}复杂度，整个故事被划分为{chapter_count}章，"
         f"每章包含{scenes_per_chapter}个场景。"
         f"当前你正在创作第{request.chapterNumber}章第{request.sceneNumber}场景，"
         f"{'这是本章的最后一个场景，需要为下一章做铺垫' if is_chapter_finale else '这不是本章的最后一个场景，需保持剧情连贯性'}\n\n"
