@@ -238,6 +238,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const key = 'gameSettings_' + Date.now();
             localStorage.setItem(key, JSON.stringify(gameSettings));
 
+            // 设置当前存档键
+            localStorage.setItem('gameSettings_current', key); // 添加此行
+            
             // 可选：记录所有key，方便管理
             let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
             allKeys.push(key);
