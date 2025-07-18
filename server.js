@@ -286,6 +286,24 @@ app.post('/api/enhance-background', (req, res) => {
     });
 });
 
+// 添加生成下一场景API代理
+app.post('/api/generate-next-scene', (req, res) => {
+    const { background, currentContent, selectedChoice } = req.body;
+    const choiceText = selectedChoice && selectedChoice.text ? selectedChoice.text.substring(0, 20) : '';
+    const cacheKey = `next_scene_${currentContent.substring(0, 30)}_${choiceText}`;
+    
+    getFromCache(cacheKey).then(cachedContent => {
+        if (cachedContent) {
+            return res.json(cachedContent);
+        } else {
+            streamProxyToPython(req, res, '/api/generate-next-scene');
+        }
+    }).catch(err => {
+        console.error('读取缓存失败:', err);
+        streamProxyToPython(req, res, '/api/generate-next-scene');
+    });
+});
+
 // 首页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));

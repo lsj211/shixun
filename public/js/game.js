@@ -264,7 +264,7 @@ function updateChoices(choices) {
         btn.addEventListener('click', handleChoiceClick);
     });
 }
-// 修改handleChoiceClick函数，考虑游戏完成状态
+// 修改handleChoiceClick函数，添加生成下一段剧情的功能
 function handleChoiceClick(event) {
     const button = event.currentTarget;
     const choiceIndex = parseInt(button.dataset.choiceIndex);
@@ -348,8 +348,8 @@ function handleChoiceClick(event) {
         // 现有的回溯处理代码...
     }
 
-    // 生成新的故事内容
-    generateNextContent(currentChoice).then(newContent => {
+    // 新增：根据大纲、当前剧情和选项内容生成下一段剧情
+    generateNextContentFromAPI(currentChoice).then(newContent => {
         // 增加章节和场景信息
         newContent.chapter = calculateNextChapter(currentStoryNode);
         newContent.scene = calculateNextScene(currentStoryNode);
@@ -366,29 +366,144 @@ function handleChoiceClick(event) {
         
         // 更新进度条
         updateChapterProgress();
+    }).catch(error => {
+        console.error('生成下一段剧情失败:', error);
+        // 恢复UI状态
+        document.getElementById('loadingIndicator').classList.add('hidden');
+        document.querySelector('.choices-container').classList.remove('disabled');
+        // 使用简单生成作为备选方案
+        generateNextContent(currentChoice).then(simpleContent => {
+            simpleContent.chapter = calculateNextChapter(currentStoryNode);
+            simpleContent.scene = calculateNextScene(currentStoryNode);
+            updateStoryWithNewContent(simpleContent);
+            updateChapterProgress();
+        });
     });
     
     console.log("选择后已探索节点:", Array.from(gameState.exploredNodes));
 }
 
-// 计算下一章节
+// 修改计算下一章节的函数，根据复杂度决定章节转换
 function calculateNextChapter(currentNode) {
-    // 根据游戏逻辑判断是否要进入下一章
-    // 这里简单实现：如果当前场景是3或更高，则进入下一章
+    // 获取当前游戏复杂度
+    const complexity = gameState.settings.complexity || 'medium';
+    
+    // 根据复杂度确定每章幕数
+    const scenesPerChapter = getSceneCountByComplexity(complexity);
+    
+    // 如果没有章节信息，返回第一章
     if (!currentNode.chapter) return 1;
-    if (currentNode.scene >= 3) {
+    
+    // 如果当前场景达到或超过了复杂度对应的幕数，则进入下一章
+    if (currentNode.scene >= scenesPerChapter) {
         return currentNode.chapter + 1;
     }
+    
+    // 否则保持当前章节
     return currentNode.chapter;
 }
 
-// 计算下一场景
+// 新增：根据复杂度获取每章幕数
+function getSceneCountByComplexity(complexity) {
+    switch(complexity) {
+        case 'simple':
+            return 2; // 简单模式，每章2幕
+        case 'complex':
+            return 4; // 复杂模式，每章4幕
+        case 'medium':
+        default:
+            return 3; // 中等模式，每章3幕（默认）
+    }
+}
+
+
+// 修改通过API生成下一段剧情内容的函数，传递复杂度信息
+async function generateNextContentFromAPI(choice) {
+    try {
+        // 收集游戏数据
+        const gameData = collectGameData();
+        
+        // 获取当前复杂度和每章幕数
+        const complexity = gameState.settings.complexity || 'medium';
+        const scenesPerChapter = getSceneCountByComplexity(complexity);
+        
+        // 计算下一幕和下一章
+        let nextChapter = currentStoryNode.chapter || 1;
+        let nextScene = (currentStoryNode.scene || 1) + 1;
+        
+        // 检查是否需要进入下一章
+        if (nextScene > scenesPerChapter) {
+            nextChapter++;
+            nextScene = 1;
+        }
+        
+        // 构建请求数据，增加场景复杂度相关信息
+        const requestData = {
+            background: gameData.background,
+            timeline: gameData.timeline,
+            locations: gameData.locations,
+            characters: gameData.characters,
+            complexity: gameData.complexity,
+            chapterNumber: nextChapter,
+            sceneNumber: nextScene,
+            scenesPerChapter: scenesPerChapter, // 传递每章幕数给后端
+            outline: gameState.storyOutline || "",
+            currentContent: currentStoryNode.content,
+            selectedChoice: {
+                text: choice.text,
+                effect: choice.effect,
+                nextContent: choice.nextContent
+            },
+            isChapterFinale: (nextScene === scenesPerChapter) // 标记是否是章节结尾
+        };
+        
+        // 调用API生成下一段剧情
+        const response = await fetch('/api/generate-next-scene', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            throw new Error(`API响应错误: ${response.status}`);
+        }
+        
+        // 解析API响应
+        const data = await response.json();
+        
+        // 返回处理后的内容
+        return {
+            id: 'node-' + Date.now(),
+            title: data.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
+            content: data.content,
+            choices: data.choices || generateSpecificChoices(data.content, extractKeywords(data.content)),
+            parentId: currentStoryNode.id,
+            chapter: nextChapter,
+            scene: nextScene
+        };
+    } catch (error) {
+        console.error('通过API生成下一段剧情失败:', error);
+        throw error;
+    }
+}
+// 修改计算下一场景的函数
 function calculateNextScene(currentNode) {
+    // 获取当前复杂度对应的每章幕数
+    const complexity = gameState.settings.complexity || 'medium';
+    const scenesPerChapter = getSceneCountByComplexity(complexity);
+    
+    // 如果当前节点没有场景信息，返回第一幕
     if (!currentNode.scene) return 1;
-    if (currentNode.scene >= 3) {
+    
+    // 如果当前场景达到了复杂度对应的幕数，重置为第一幕（新章节）
+    if (currentNode.scene >= scenesPerChapter) {
         return 1; // 新章节，场景重置为1
     }
-    return currentNode.scene + 1; // 同章节，场景+1
+    
+    // 否则场景号+1，继续当前章节的下一幕
+    return currentNode.scene + 1; 
 }
 
 // 添加使用现有节点更新故事的函数
