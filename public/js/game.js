@@ -28,7 +28,7 @@ const gameState = {
 };
 
 // 新增：用存档内容覆盖gameState
-(function applyArchiveToGameState() {
+function applyArchiveToGameState() {
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
     if (archiveKey) {
@@ -58,7 +58,9 @@ const gameState = {
             console.warn('存档解析失败', e);
         }
     }
-})();
+}
+
+applyArchiveToGameState();
 
 
 // 添加更新进度条的函数
@@ -97,7 +99,7 @@ function updateChapterProgress() {
         progressBar.style.width = `${progressPercent}%`;
         
         // 检查是否到达最终章节
-        if (currentChapter >= totalChapters) {
+        if (currentChapter == totalChapters && currentStoryNode.scene == getSceneCountByComplexity(gameState.settings.complexity)) {
             showGameCompleteMessage();
         }
     }
@@ -200,7 +202,7 @@ let currentStoryNode = storyContent.opening;
 
 // 修改初始化游戏函数，确保初始节点被记录
 function initializeGame() {
-    currentStoryNode.content = gameState.storyBackground;
+    // currentStoryNode.content = gameState.storyBackground;
     // 确保初始节点有ID
     if (!currentStoryNode.id) {
         currentStoryNode.id = 'node-1';
@@ -211,7 +213,7 @@ function initializeGame() {
 
     // 记录初始节点已被探索
     gameState.exploredNodes.add(currentStoryNode.id);
-    gameState.currentPath.push(currentStoryNode.id);
+    // gameState.currentPath.push(currentStoryNode.id);
     
     // 显示初始内容
     updateStoryDisplay(currentStoryNode);
@@ -282,7 +284,7 @@ function updateChoices(choices) {
         btn.addEventListener('click', handleChoiceClick);
     });
 }
-// 修改handleChoiceClick函数，添加生成下一段剧情的功能
+
 function handleChoiceClick(event) {
     const button = event.currentTarget;
     const choiceIndex = parseInt(button.dataset.choiceIndex);
@@ -326,7 +328,7 @@ function handleChoiceClick(event) {
     document.getElementById('loadingIndicator').classList.remove('hidden');
     document.querySelector('.choices-container').classList.add('disabled');
 
-    // 如果游戏已完成，只允许使用已有分支，不创建新分支
+    // 如果游戏已完成，只允许使用已有分支
     if (gameState.gameCompleted) {
         // 查找现有分支
         const parentNode = findNodeInStoryTree(currentStoryNode.id);
@@ -340,7 +342,8 @@ function handleChoiceClick(event) {
         }
         
         if (existingChildForChoice) {
-            // 如果找到匹配的分支，使用现有分支
+            // 使用现有分支
+            currentStoryNode = existingChildForChoice;
             updateStoryWithExistingNode(existingChildForChoice);
             
             // 隐藏加载状态
@@ -351,7 +354,7 @@ function handleChoiceClick(event) {
             updateChapterProgress();
             return;
         } else {
-            // 如果没有找到匹配的分支，显示提示
+            // 显示提示
             alert('游戏已结束，只能探索现有的剧情分支。');
             
             // 隐藏加载状态
@@ -366,13 +369,26 @@ function handleChoiceClick(event) {
         // 现有的回溯处理代码...
     }
 
-    // 新增：根据大纲、当前剧情和选项内容生成下一段剧情
+    // // 立即创建临时节点并切换
+    // const tempNode = {
+    //     id: 'temp-node-' + Date.now(),
+    //     title: `第${calculateNextChapter(currentStoryNode)}章：加载中...`,
+    //     content: currentChoice.nextContent || '正在生成剧情...',
+    //     choices: [], // 暂时不显示选择
+    //     parentId: currentStoryNode.id,
+    //     chapter: calculateNextChapter(currentStoryNode),
+    //     scene: currentStoryNode.scene
+    // };
+    
+    // // 更新当前节点为临时节点并显示
+    // currentStoryNode = tempNode;
+    // updateStoryDisplay(tempNode);
+    // updateChoices(tempNode.choices); // 清空选择按钮
+
+    // 异步生成下一段剧情并流式更新
     generateNextContentFromAPI(currentChoice).then(newContent => {
-        // 增加章节和场景信息
-        newContent.chapter = calculateNextChapter(currentStoryNode);
-        newContent.scene = calculateNextScene(currentStoryNode);
-        
-        // 更新故事显示
+        // 更新临时节点为最终节点
+        currentStoryNode = newContent;
         updateStoryWithNewContent(newContent);
         
         // 隐藏加载状态
@@ -393,6 +409,7 @@ function handleChoiceClick(event) {
         generateNextContent(currentChoice).then(simpleContent => {
             simpleContent.chapter = calculateNextChapter(currentStoryNode);
             simpleContent.scene = calculateNextScene(currentStoryNode);
+            currentStoryNode = simpleContent;
             updateStoryWithNewContent(simpleContent);
             updateChapterProgress();
         });
@@ -408,7 +425,9 @@ function calculateNextChapter(currentNode) {
     
     // 根据复杂度确定每章幕数
     const scenesPerChapter = getSceneCountByComplexity(complexity);
-    
+    console.log(`当前复杂度: ${complexity}, 每章幕数: ${scenesPerChapter}`);
+    console.log(currentNode.scene);
+    console.log(currentNode.chapter);
     // 如果没有章节信息，返回第一章
     if (!currentNode.chapter) return 1;
     
@@ -434,8 +453,105 @@ function getSceneCountByComplexity(complexity) {
     }
 }
 
+// 修改通过API生成故事结局的函数，确保传递所有必要参数
+async function generateStoryEnding(currentChoice) {
+    try {
+        // 收集游戏数据
+        const gameData = collectGameData();
 
-// 修改通过API生成下一段剧情内容的函数，确保传递所有必要参数
+        // 获取当前复杂度和章节设置
+        const complexity = gameState.settings.complexity || 'medium';
+        const chapterCount = gameState.settings.chapterCount || 5;
+        const scenesPerChapter = getSceneCountByComplexity(complexity);
+
+        // 提取当前路径上所有节点的内容及章节信息（包括当前节点）
+        const pathNodes = gameState.currentPath.map(node => ({
+            content: node.content || '',
+            chapter: node.chapter || 1,
+            scene: node.scene || 1,
+            title: node.title || `第${node.chapter || 1}章 场景${node.scene || 1}`
+        }));
+
+        // 使用当前节点的章节信息和当前选择
+        const currentNode = {
+            chapter: currentStoryNode.chapter || 1,
+            scene: currentStoryNode.scene || 1,
+            title: currentStoryNode.title || `第${currentStoryNode.chapter || 1}章 场景${currentStoryNode.scene || 1}`,
+            choice: currentChoice // 当前选择
+        };
+
+        // 获取当前章节和场景信息
+        const currentChapter = currentNode.chapter || 1;
+        const currentScene = currentNode.scene || 1;
+
+        // 构建请求数据，包含所有必要参数
+        const requestData = {
+            background: gameData.background || "",
+            timeline: gameData.timeline || [],
+            locations: gameData.locations || [],
+            characters: gameData.characters || [],
+            complexity: complexity,
+            chapterCount: chapterCount,
+            scenesPerChapter: scenesPerChapter,
+            outline: gameState.storyOutline || "",
+            pathNodes: pathNodes, // 包含所有路径节点（包括当前节点）
+            currentNode: currentNode, // 当前节点及其选择
+            currentChapter: currentChapter,
+            currentScene: currentScene,
+            isFinalEnding: true
+        };
+
+        console.log("发送到API的请求数据:", {
+            complexity: requestData.complexity,
+            chapterCount: requestData.chapterCount,
+            pathLength: pathNodes.length,
+            currentChapter: currentChapter,
+            currentScene: currentScene,
+            choice: currentChoice.text || "无选择文本"
+        });
+
+        // 调用API生成故事结局
+        const response = await fetch('/api/generate-story-ending', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API响应错误: ${response.status}, ${errorText}`);
+        }
+
+        // 解析API响应
+        const data = await response.json();
+
+        // 返回处理后的结局内容
+        const storyEnding = {
+            id: 'ending-' + Date.now(),
+            title: data.title || `第${currentChapter}章 结局`,
+            content: data.content,
+            choices: [],
+            parentId: currentStoryNode.id,
+            chapter: currentChapter,
+            scene: scenesPerChapter, // 结局通常是本章最后一个场景
+            isEnding: true
+        };
+
+        console.log("生成的故事结局:", storyEnding);
+
+        currentStoryNode = storyEnding; // 更新当前节点为结局节点
+
+        return storyEnding;
+    } catch (error) {
+        console.error('通过API生成故事结局失败:', error);
+        throw error;
+    }
+}
+
+
+// 修改通过API生成下一段剧情内容的函数，支持实时流式更新
 async function generateNextContentFromAPI(choice) {
     try {
         // 收集游戏数据
@@ -447,9 +563,15 @@ async function generateNextContentFromAPI(choice) {
         const chapterCount = gameState.settings.chapterCount || 5;
         
         // 计算下一幕和下一章
-        let nextChapter = currentStoryNode.chapter || 1;
-        let nextScene = (currentStoryNode.scene || 1) + 1;
+        let nextChapter = calculateNextChapter(currentStoryNode);
+        let nextScene = calculateNextScene(currentStoryNode);
+        console.log(`当前章节: ${nextChapter}, 当前场景: ${nextScene}, 每章幕数: ${scenesPerChapter}`);
         
+        if(nextChapter==chapterCount&&nextScene===scenesPerChapter){ 
+            // 如果已经是最后一章的最后一幕，直接返回结局
+            return generateStoryEnding(choice);
+        }
+
         // 检查是否需要进入下一章
         let isChapterFinale = false;
         if (nextScene > scenesPerChapter) {
@@ -458,8 +580,7 @@ async function generateNextContentFromAPI(choice) {
         } else if (nextScene === scenesPerChapter) {
             isChapterFinale = true;
         }
-        
-        // 构建请求数据，确保包含所有必要参数
+        // 构建请求数据
         const requestData = {
             background: gameData.background || "",
             timeline: gameData.timeline || [],
@@ -487,36 +608,172 @@ async function generateNextContentFromAPI(choice) {
             chapterCount: requestData.chapterCount,
             scenesPerChapter: requestData.scenesPerChapter
         });
-        
-        // 调用API生成下一段剧情
-        const response = await fetch('/api/generate-next-scene', {
+
+        // 获取内容容器
+        let contentContainer = document.getElementById('storyText');
+        let streamingIndicator = null;
+
+        // 防御性检查：如果storyContent不存在，创建临时容器
+        if (!contentContainer) {
+            console.warn('未找到storyContent元素，创建临时容器');
+            contentContainer = document.createElement('div');
+            contentContainer.id = 'storyContent';
+            contentContainer.style.minHeight = '100px';
+            contentContainer.style.padding = '10px';
+            contentContainer.style.overflowY = 'auto';
+            document.body.appendChild(contentContainer);
+        }
+
+        // 创建流式内容指示器
+        streamingIndicator = document.createElement('div');
+        streamingIndicator.id = 'streamingIndicator';
+        streamingIndicator.textContent = '正在生成剧情...';
+        streamingIndicator.style.color = '#666';
+        streamingIndicator.style.fontStyle = 'italic';
+        contentContainer.appendChild(streamingIndicator);
+
+        // 使用fetch处理SSE
+        const response = await fetch('http://localhost:3000/api/generate-next-scene', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify(requestData)
         });
-        
+
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API响应错误: ${response.status}, ${errorText}`);
+            throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
         }
-        
-        // 解析API响应
-        const data = await response.json();
-        
-        // 返回处理后的内容
-        return {
-            id: 'node-' + Date.now(),
-            title: data.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
-            content: data.content,
-            choices: data.choices || generateSpecificChoices(data.content, extractKeywords(data.content)),
-            parentId: currentStoryNode.id,
-            chapter: nextChapter,
-            scene: nextScene
-        };
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullResponse = '';
+
+        return new Promise((resolve, reject) => {
+            async function readStream() {
+                try {
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        if (done) {
+                            if (streamingIndicator && streamingIndicator.parentNode) {
+                                streamingIndicator.remove();
+                            }
+                            // 解析最终的JSON响应
+                            let result;
+                            try {
+                                result = JSON.parse(fullResponse);
+                            } catch (e) {
+                                console.warn('无法解析完整JSON:', e, 'fullResponse:', fullResponse);
+                                // 尝试提取JSON部分
+                                const jsonMatch = fullResponse.match(/(\{[\s\S]*?\})/);
+                                if (jsonMatch) {
+                                    try {
+                                        result = JSON.parse(jsonMatch[1]);
+                                    } catch (e2) {
+                                        console.warn('无法解析提取的JSON，构造默认结构:', e2);
+                                        result = {
+                                            title: `第${requestData.chapterNumber}章：新的发展`,
+                                            content: fullResponse,
+                                            choices: [
+                                                {
+                                                    text: "继续探索",
+                                                    effect: "寻找更多线索",
+                                                    nextContent: "你决定继续前进..."
+                                                },
+                                                {
+                                                    text: "谨慎行动",
+                                                    effect: "保持警惕",
+                                                    nextContent: "你决定更加小心地行动..."
+                                                }
+                                            ]
+                                        };
+                                    }
+                                } else {
+                                    console.warn('无法提取JSON，构造默认结构');
+                                    result = {
+                                        title: `第${requestData.chapterNumber}章：新的发展`,
+                                        content: fullResponse,
+                                        choices: [
+                                            {
+                                                text: "继续探索",
+                                                effect: "寻找更多线索",
+                                                nextContent: "你决定继续前进..."
+                                            },
+                                            {
+                                                text: "谨慎行动",
+                                                effect: "保持警惕",
+                                                nextContent: "你决定更加小心地行动..."
+                                            }
+                                        ]
+                                    };
+                                }
+                            }
+
+                            // 构造下一故事节点
+                            const nextStoryNode = {
+                                id: 'node-' + Date.now(),
+                                title: result.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
+                                content: result.content || fullResponse,
+                                choices: result.choices || generateSpecificChoices(result.content || fullResponse, extractKeywords(result.content || fullResponse)),
+                                parentId: currentStoryNode.id,
+                                chapter: nextChapter,
+                                scene: nextScene
+                            };
+
+                            console.log("生成的下一段剧情:", nextStoryNode);
+                            resolve(nextStoryNode);
+                            break;
+                        }
+
+                        // 解码流式数据
+                        const chunk = decoder.decode(value, { stream: true });
+                        const lines = chunk.split('\n');
+                        for (const line of lines) {
+                            if (line.startsWith('data: ')) {
+                                const dataStr = line.slice(6).trim();
+                                if (!dataStr) continue;
+                                try {
+                                    const data = JSON.parse(dataStr);
+                                    if (data.done) {
+                                        // 保存最终JSON数据
+                                        fullResponse = typeof data.text === 'string' ? data.text : JSON.stringify(data.text);
+                                        continue;
+                                    }
+                                    // 实时更新内容
+                                    fullResponse += data.text;
+                                    // 强制触发DOM更新
+                                    requestAnimationFrame(() => {
+                                        contentContainer.innerHTML = `<p>${fullResponse}</p>`;
+                                        contentContainer.scrollTop = contentContainer.scrollHeight;
+                                    });
+                                } catch (e) {
+                                    console.warn('无法解析SSE数据:', dataStr, e);
+                                    // 假设非JSON数据是文本内容，累积并显示
+                                    fullResponse += dataStr;
+                                    requestAnimationFrame(() => {
+                                        contentContainer.innerHTML = `<p>${fullResponse}</p>`;
+                                        contentContainer.scrollTop = contentContainer.scrollHeight;
+                                    });
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('处理流式数据失败:', error);
+                    if (streamingIndicator && streamingIndicator.parentNode) {
+                        streamingIndicator.remove();
+                    }
+                    reject(error);
+                }
+            }
+
+            readStream();
+        });
     } catch (error) {
         console.error('通过API生成下一段剧情失败:', error);
+        if (streamingIndicator && streamingIndicator.parentNode) {
+            streamingIndicator.remove();
+        }
         throw error;
     }
 }
@@ -543,7 +800,7 @@ function calculateNextScene(currentNode) {
 function updateStoryWithExistingNode(node) {
     // 记住当前节点ID作为父节点ID
     const parentNodeId = currentStoryNode.id;
-    
+    console.log(99999999999);
     // 更新当前节点
     currentStoryNode = {
         id: node.id,
@@ -700,41 +957,26 @@ function generateSpecificChoices(currentContent, keywords) {
 
 // 修改更新故事内容的函数，记录新节点ID和路径，维护父子关系
 function updateStoryWithNewContent(newContent) {
-    // 记住当前节点ID作为父节点ID
-    const parentNodeId = currentStoryNode.id;
-    
-    // 生成新节点ID (如果没有的话)
-    if (!newContent.id) {
-        newContent.id = 'node-' + Date.now();
-    }
-    
-    // 更新当前节点
-    currentStoryNode = {
-        id: newContent.id,
-        title: newContent.title,
-        content: newContent.content,
-        choices: newContent.choices,
-        parentId: parentNodeId  // 重要：记录父节点关系
-    };
+    const parentNodeId = currentStoryNode.parentId;
+    console.log("更新后的当前节点:", newContent);
 
-    // 缓存新节点数据 - 新增这一行
-    cacheNodeData(currentStoryNode);
+    // 缓存新节点数据
+    cacheNodeData(newContent);
 
     // 记录新节点已被探索
-    gameState.exploredNodes.add(currentStoryNode.id);
-    gameState.currentPath.push(currentStoryNode.id);
+    gameState.exploredNodes.add(newContent.id);
+    gameState.currentPath.push(newContent.id);
     
     // 更新游戏状态中的树结构
-    updateStoryTreeStructure(parentNodeId, currentStoryNode);
+    updateStoryTreeStructure(parentNodeId, newContent);
 
     // 更新显示
-    updateStoryDisplay(currentStoryNode);
+    updateStoryDisplay(newContent);
     updateChoices(newContent.choices);
 
     // 更新侧边栏剧情树
     updateSidePanelStoryTree();
 }
-
 // 更新游戏状态中的树结构
 function updateStoryTreeStructure(parentNodeId, childNode) {
     // 如果游戏状态没有树，则初始化
@@ -3306,15 +3548,18 @@ async function startGame() {
         // 更新加载状态文本
         updateLoadingText('正在生成场景图像...');
         
+        const beginid='node-' + Date.now();
         // 更新当前节点
         currentStoryNode = {
-            id: 'chapter-1-scene-1',
+            id: beginid,
             title: chapterResponse.title,
             content: chapterResponse.content,
             choices: chapterResponse.choices,
             chapter: 1,
             scene: 1
         };
+        
+        updateStoryTreeStructure(null, currentStoryNode);
         
         // 缓存初始节点 - 新增这一行
         cacheNodeData(currentStoryNode);
@@ -3557,12 +3802,22 @@ function saveGameToArchive(archiveKey = null) {
     const dateTimeStr = `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
     
     // 生成存档键，格式：archive_标题_YYYYMMDDHHMMSS
+    // if (!archiveKey) {
+    //     // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
+    //     // archiveKey = `archive_${titleBase}_${timeForKey}`;
+    //     // // 替换可能导致问题的字符
+    //     // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
+    //     archiveKey = 'gameSettings_' + Date.now();
+    // }
+    const newkey='gameSettings_' + Date.now();
     if (!archiveKey) {
-        // const timeForKey = `${year}${month}${day}${hours}${minutes}${seconds}`;
-        // archiveKey = `archive_${titleBase}_${timeForKey}`;
-        // // 替换可能导致问题的字符
-        // archiveKey = archiveKey.replace(/[\/\\:*?"<>|]/g, '_');
-        archiveKey = 'gameSettings_' + Date.now();
+        archiveKey = localStorage.getItem('gameSettings_current');
+        // const newkey='gameSettings_' + Date.now();
+        console.log('当前存档键:', archiveKey);
+        // // 如果没有当前存档，则使用时间戳创建一个新存档
+        // if (!archiveKey) {
+        //     archiveKey = 'gameSettings_' + Date.now();
+        // }
     }
     console.log(dateTimeStr)
     // 创建分类的存档数据结构
@@ -3586,11 +3841,9 @@ function saveGameToArchive(archiveKey = null) {
         
         // 角色数据
         characters: gameState.characters || [],
-        
+        title: gameState.title || "无标题",
         // 故事大纲
         storyOutline: gameState.storyOutline || "",
-
-        title: gameState.title || "无标题",
         
         // 游戏进度数据
         gameProgress: {
@@ -3647,17 +3900,29 @@ function saveGameToArchive(archiveKey = null) {
     // 保存到 localStorage - 参考 setting.js 的方式
     try {
         // 保存存档数据
-        localStorage.setItem(archiveKey, JSON.stringify(archiveData));
-        localStorage.setItem('gameSettings_current', archiveKey);
-        
+        localStorage.setItem(newkey, JSON.stringify(archiveData));
+        localStorage.setItem('gameSettings_current', newkey);
+
+        // 关键：同步更新 URL 中的 archive 参数
+        const url = new URL(window.location.href);
+        url.searchParams.set('archive', newkey); // 将 URL 参数更新为新存档键
+        history.pushState(null, '', url); // 不刷新页面更新 URL
+        if (archiveKey && archiveKey !== newkey) {
+            localStorage.removeItem(archiveKey); // 删除旧存档
+        }
         // 更新存档列表 - 与 setting.js 中的方式保持一致
         let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-        if (!allKeys.includes(archiveKey)) {
-            allKeys.push(archiveKey);
+        if (archiveKey) {
+            allKeys = allKeys.filter(key => key !== archiveKey);
+        }
+        if (!allKeys.includes(newkey)) {
+            allKeys.push(newkey);
             localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
         }
         
-        console.log('游戏已保存到存档:', archiveKey);
+        console.log('游戏已保存到存档:', newkey);
+        applyArchiveToGameState();
+        initializeGame();
         return true;
     } catch (error) {
         console.error('保存游戏失败:', error);
@@ -3669,6 +3934,8 @@ function saveGameToArchive(archiveKey = null) {
         return false;
     }
 }
+
+
 
 // 修改分块保存函数，确保使用相同的命名逻辑
 function saveGameInChunks(archiveKey, archiveData) {
@@ -3968,14 +4235,14 @@ function initSaveGameFeature() {
         }
     });
     
-    // 添加自动保存功能（每5分钟自动保存一次）
-    setInterval(() => {
-        // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
-        // const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
-        // saveGameToArchive(autoSaveName);
-        saveGameToArchive();
-        console.log('游戏已自动保存');
-    }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
+    // // 添加自动保存功能（每5分钟自动保存一次）
+    // setInterval(() => {
+    //     // 为自动保存添加auto前缀，但仍使用"标题+时间"格式
+    //     // const autoSaveName = `auto_${currentStoryNode.title ? currentStoryNode.title.substring(0, 10) : '自动存档'}`;
+    //     // saveGameToArchive(autoSaveName);
+    //     // saveGameToArchive();
+    //     // console.log('游戏已自动保存');
+    // }, 5 * 60 * 1000); // 5分钟 = 300000毫秒
     
     // 获取已有的加载进度按钮
     const loadBtn = document.querySelector('.load-btn');
@@ -4404,12 +4671,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // 获取当前存档键
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
-    
+    console.log( urlParams.get('archive'));
+    console.log(localStorage.getItem('gameSettings_current'));
     // 检查是否从存档加载游戏且存档中已有游戏内容
     if (archiveKey) {
         try {
             const archiveData = JSON.parse(localStorage.getItem(archiveKey));
-            
+            console.log('加载存档数据:', archiveData);
             // 检查存档是否为分块存储
             if (archiveData && archiveData.isChunked) {
                 // 检查分块存档中是否有游戏进度数据

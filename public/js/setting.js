@@ -362,7 +362,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // 标记为已完成，避免重复处理
                 isGeneratingCharacters = false;
-            }, 30000); // 30秒超时
+            }, 300000); // 30秒超时
             
             console.log("准备调用API..."); // 调试日志
             
