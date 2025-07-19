@@ -98,8 +98,10 @@ function updateChapterProgress() {
         const progressPercent = (currentChapter / totalChapters) * 100;
         progressBar.style.width = `${progressPercent}%`;
         
+        console.log("不对劲");
         // 检查是否到达最终章节
-        if (currentChapter >= totalChapters) {
+        if (currentChapter == totalChapters&& currentStoryNode.scene == getSceneCountByComplexity(gameState.settings.complexity)) {
+            console.log("游戏已完成，显示完成消息");
             showGameCompleteMessage();
         }
     }
@@ -370,7 +372,6 @@ function handleChoiceClick(event) {
 
     // 新增：根据大纲、当前剧情和选项内容生成下一段剧情
     generateNextContentFromAPI(currentChoice).then(newContent => {
-
         console.log("当前节点:", currentStoryNode);
         // 增加章节和场景信息
         // newContent.chapter = calculateNextChapter(currentStoryNode);
@@ -455,11 +456,16 @@ async function generateNextContentFromAPI(choice) {
         // 计算下一幕和下一章
         let nextChapter = calculateNextChapter(currentStoryNode);
         let nextScene = calculateNextScene(currentStoryNode);
-        // let nextChapter = currentStoryNode.chapter || 1;
-        // let nextScene = (currentStoryNode.scene || 1);
+        
         console.log(currentStoryNode);
         console.log(currentStoryNode.scene);
         console.log(`当前章节: ${nextChapter}, 当前场景: ${nextScene}, 每章幕数: ${scenesPerChapter}`);
+
+        if(nextChapter==chapterCount&&nextScene===scenesPerChapter){ 
+            // 如果已经是最后一章的最后一幕，直接返回结局
+            return generateStoryEnding(choice);
+        }
+
 
         // 检查是否需要进入下一章
         let isChapterFinale = false;
@@ -534,6 +540,106 @@ async function generateNextContentFromAPI(choice) {
         throw error;
     }
 }
+
+
+// 修改通过API生成故事结局的函数，确保传递所有必要参数
+async function generateStoryEnding(currentChoice) {
+    try {
+        // 收集游戏数据
+        const gameData = collectGameData();
+        
+        // 获取当前复杂度和章节设置
+        const complexity = gameState.settings.complexity || 'medium';
+        const chapterCount = gameState.settings.chapterCount || 5;
+        const scenesPerChapter = getSceneCountByComplexity(complexity);
+        
+        // 提取当前路径上所有节点的内容及章节信息（包括当前节点）
+        const pathNodes = gameState.currentPath.map(node => ({
+            content: node.content || '',
+            chapter: node.chapter || 1,
+            scene: node.scene || 1,
+            title: node.title || `第${node.chapter || 1}章 场景${node.scene || 1}`
+        }));
+        
+        // 使用当前节点的章节信息和当前选择
+        const currentNode = {
+            chapter: currentStoryNode.chapter || 1,
+            scene: currentStoryNode.scene || 1,
+            title: currentStoryNode.title || `第${currentStoryNode.chapter || 1}章 场景${currentStoryNode.scene || 1}`,
+            choice: currentChoice // 当前选择
+        };
+        
+        // 获取当前章节和场景信息
+        const currentChapter = currentNode.chapter || 1;
+        const currentScene = currentNode.scene || 1;
+        
+        // 构建请求数据，包含所有必要参数
+        const requestData = {
+            background: gameData.background || "",
+            timeline: gameData.timeline || [],
+            locations: gameData.locations || [],
+            characters: gameData.characters || [],
+            complexity: complexity,
+            chapterCount: chapterCount,
+            scenesPerChapter: scenesPerChapter,
+            outline: gameState.storyOutline || "",
+            pathNodes: pathNodes, // 包含所有路径节点（包括当前节点）
+            currentNode: currentNode, // 当前节点及其选择
+            currentChapter: currentChapter,
+            currentScene: currentScene,
+            isFinalEnding: true
+        };
+        
+        console.log("发送到API的请求数据:", {
+            complexity: requestData.complexity,
+            chapterCount: requestData.chapterCount,
+            pathLength: pathNodes.length,
+            currentChapter: currentChapter,
+            currentScene: currentScene,
+            choice: currentChoice.text || "无选择文本"
+        });
+        
+        // 调用API生成故事结局
+        const response = await fetch('/api/generate-story-ending', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(requestData)
+        });
+        
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`API响应错误: ${response.status}, ${errorText}`);
+        }
+        
+        // 解析API响应
+        const data = await response.json();
+        
+        // 返回处理后的结局内容
+        const storyEnding = {
+            id: 'ending-' + Date.now(),
+            title: data.title || `第${currentChapter}章 结局`,
+            content: data.content,
+            choices: [],
+            parentId: currentStoryNode.id,
+            chapter: currentChapter,
+            scene: scenesPerChapter, // 结局通常是本章最后一个场景
+            isEnding: true
+        };
+        
+        console.log("生成的故事结局:", storyEnding);
+
+        currentStoryNode = storyEnding; // 更新当前节点为结局节点
+
+        return storyEnding;
+    } catch (error) {
+        console.error('通过API生成故事结局失败:', error);
+        throw error;
+    }
+} 
+
+
 
 // 修改计算下一场景的函数
 function calculateNextScene(currentNode) {

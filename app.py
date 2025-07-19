@@ -437,7 +437,8 @@ async def root():
             "/api/generate-background",
             "/api/generate-characters",
             "/api/generate-story-node",
-            "/api/generate-story-title"
+            "/api/generate-story-title",
+            "/api/generate-story-ending"
         ]
     }
 
@@ -885,6 +886,108 @@ async def generate_next_scene(request: NextSceneRequest):
     except Exception as e:
         print(f"生成下一场景失败: {e}")
         raise HTTPException(status_code=500, detail=f"生成下一场景失败: {str(e)}")
+
+
+
+class StoryEndingRequest(BaseModel):
+    background: str
+    timeline: list
+    locations: list
+    characters: list
+    complexity: str
+    chapterCount: int
+    scenesPerChapter: int
+    outline: str
+    pathNodes: list
+    currentNode: dict
+    currentChapter: int
+    currentScene: int
+    isFinalEnding: bool
+
+# 格式化路径节点（将所有节点拼接为一段文本）
+def format_path_nodes(path_nodes):
+    # 拼接所有路径节点的内容
+    full_content = "\n".join([f"第{node.get('chapter', 1)}章 第{node.get('scene', 1)}场景: {node.get('content', '')}" for node in path_nodes])
+    return full_content
+
+@app.post("/api/generate-story-ending")
+async def generate_story_ending(request: StoryEndingRequest):
+    """根据当前剧情和选择生成故事结局"""
+    # 记录请求信息以便调试
+    print(f"收到生成故事结局请求: chapter={request.currentChapter}, scene={request.currentScene}, complexity={request.complexity}")
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的交互式小说作家。请根据当前剧情内容，创作整个故事的结局。\n\n"
+        f"基于{request.complexity}复杂度，整个故事被划分为{request.chapterCount}章，"
+        f"每章包含{request.scenesPerChapter}个场景。"
+        f"当前你正在创作整个故事的结局内容，结局应当与当前剧情、角色发展以及大纲保持一致。\n\n"
+        "请参考以下信息并结合当前已发生的剧情设计结局：\n\n"
+        f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
+        f"故事大纲：\n{request.outline}\n\n"
+        f"角色信息：\n{format_characters(request.characters)}\n\n"
+        f"世界背景：\n{request.background}\n\n"
+        "结局应包含以下要求：\n"
+        "1. 内容应与当前剧情、角色发展和大纲保持连贯性\n"
+        "2. 场景应有生动的描述和角色互动\n"
+        "3. 结局应该具有转折性或悬念\n"
+        "4. 返回的结局不应包含新的选择\n"
+        "5. 章节标题应该简洁有吸引力\n\n"
+        "返回JSON格式：\n"
+        "{\n"
+        '  "title": "结局标题",\n'
+        '  "content": "详细的结局描述...",\n'
+        '}'
+    )
+    
+    human_template = (
+        f"世界背景：{request.background}\n\n"
+        f"前情提要：\n{format_timeline(request.timeline)}\n\n"
+        f"重要地点：\n{format_locations(request.locations)}\n\n"
+        f"角色信息：\n{format_characters(request.characters)}\n\n"
+        f"故事大纲：\n{request.outline}\n\n"
+        f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
+        f"当前任务：请创作整个故事的结局，结局应与当前剧情和大纲保持一致，并且不应包含新的选择。"
+    )
+    
+    messages = [
+        {"role": "system", "content": system_template},
+        {"role": "user", "content": human_template}
+    ]
+    
+    try:
+        # 模拟调用聊天模型生成内容
+        response = await chat_model.ainvoke(messages)
+        
+        # 尝试解析JSON响应
+        content = response.content
+        
+        try:
+            result = json.loads(content)    
+            print(f"生成的结局内容: {result}")
+        except:
+            result = {
+                "title": "结局：新的开始",
+                "content": content.content
+            }
+            # result = {
+            #     "title": content.title,
+            #     "content": content.content
+            # }
+        
+        # 返回生成的结局
+        return {
+            "title": "尾声: "+result.get('title', "结局标题"),
+            "content": result.get('content', ""),
+            "choices": []  # 不返回新的选择
+        }
+    except Exception as e:
+        print(f"生成故事结局失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成故事结局失败: {str(e)}")
+
+
+
+
 
 # 新增：根据复杂度获取场景数
 def get_scenes_per_complexity(complexity: str) -> int:
