@@ -74,7 +74,7 @@ try:
         model_name="qwen-max",
         temperature=0.7,
         top_p=0.8,
-        max_tokens=1500,
+        max_tokens=500,
         streaming=True,  # 开启流式输出
     )
     print("成功初始化通义千问模型")
@@ -437,8 +437,7 @@ async def root():
             "/api/generate-background",
             "/api/generate-characters",
             "/api/generate-story-node",
-            "/api/generate-story-title",
-            "/api/generate-story-ending"
+            "/api/generate-story-title"
         ]
     }
 
@@ -777,32 +776,38 @@ class NextSceneRequest(BaseModel):
     isChapterFinale: bool = False  # 添加章节结尾标记
 
 @app.post("/api/generate-next-scene")
-async def generate_next_scene(request: NextSceneRequest):
-    """根据当前剧情和选择生成下一场景"""
+async def generate_next_scene(request: dict):  # 简化为dict以避免严格的模型验证
+    """根据当前剧情和选择生成下一场景（流式输出）"""
     # 记录请求信息以便调试
-    print(f"收到生成下一场景请求: chapter={request.chapterNumber}, scene={request.sceneNumber}, complexity={request.complexity}")
+    print(f"收到生成下一场景请求: chapter={request.get('chapterNumber')}, scene={request.get('sceneNumber')}, complexity={request.get('complexity')}")
     
     # 创建缓存键
-    choice_text = request.selectedChoice.get("text", "")[:20]
-    cache_key = f"next_scene_{request.chapterNumber}_{request.sceneNumber}_{choice_text}"
+    choice_text = request.get('selectedChoice', {}).get("text", "")[:20]
+    cache_key = f"next_scene_{request.get('chapterNumber')}_{request.get('sceneNumber')}_{choice_text}"
     
     # 检查缓存
     cached_content = get_from_cache(cache_key)
     if cached_content:
-        return cached_content
+        async def stream_cached_content():
+            yield f"data: {json.dumps({'text': cached_content, 'done': True})}\n\n"
+        
+        return StreamingResponse(
+            stream_cached_content(),
+            media_type="text/event-stream"
+        )
     
     # 确定章节结构信息
-    scenes_per_chapter = request.scenesPerChapter if hasattr(request, 'scenesPerChapter') else get_scenes_per_complexity(request.complexity)
-    is_chapter_finale = request.isChapterFinale if hasattr(request, 'isChapterFinale') else (request.sceneNumber >= scenes_per_chapter)
-    chapter_count = request.chapterCount if hasattr(request, 'chapterCount') else 5
+    scenes_per_chapter = request.get('scenesPerChapter', get_scenes_per_complexity(request.get('complexity', 'medium')))
+    is_chapter_finale = request.get('isChapterFinale', request.get('sceneNumber', 1) >= scenes_per_chapter)
+    chapter_count = request.get('chapterCount', 5)
     
     # 构建提示模板，增加章节结构相关指导
     system_template = (
         "你是一位专业的交互式小说作家。请根据当前剧情内容和用户的选择，"
-        f"创作第{request.chapterNumber}章第{request.sceneNumber}场景的具体内容。\n\n"
-        f"基于{request.complexity}复杂度，整个故事被划分为{chapter_count}章，"
+        f"创作第{request.get('chapterNumber')}章第{request.get('sceneNumber')}场景的具体内容。\n\n"
+        f"基于{request.get('complexity')}复杂度，整个故事被划分为{chapter_count}章，"
         f"每章包含{scenes_per_chapter}个场景。"
-        f"当前你正在创作第{request.chapterNumber}章第{request.sceneNumber}场景，"
+        f"当前你正在创作第{request.get('chapterNumber')}章第{request.get('sceneNumber')}场景，"
         f"{'这是本章的最后一个场景，需要为下一章做铺垫' if is_chapter_finale else '这不是本章的最后一个场景，需保持剧情连贯性'}\n\n"
         "请遵循以下要求：\n"
         "1. 内容应与当前剧情和用户选择保持连贯性\n"
@@ -810,7 +815,9 @@ async def generate_next_scene(request: NextSceneRequest):
         f"3. {'由于这是章节结尾，请设计具有转折性或悬念的剧情，并提供2-3个能引导故事进入下一章的选择' if is_chapter_finale else '请设计2-3个有意义的选择，能够推动剧情向不同方向发展'}\n"
         "4. 每个选择应包含简短的效果提示\n"
         "5. 章节标题应该简洁有吸引力\n"
-        f"6. 按照{request.complexity}级别的复杂度设计场景和对话\n\n"
+        f"6. 按照{request.get('complexity')}级别的复杂度设计场景和对话\n\n"
+        "7. **必须严格返回JSON格式，且JSON语法中所有标点符号（包括逗号、引号、冒号）必须使用英文标点（如, 、\" 、:），绝对不能使用中文标点（如，、“”、：）**\n"
+        "8. 确保JSON中键值对之间用英文逗号分隔，数组元素（如choices中的选项）之间也用英文逗号分隔，且最后一个元素后无多余逗号\n\n"
         "返回JSON格式：\n"
         "{\n"
         '  "title": "第X章：章节标题",\n'
@@ -824,17 +831,17 @@ async def generate_next_scene(request: NextSceneRequest):
     )
     
     human_template = (
-        f"世界背景：{request.background}\n\n"
-        f"前情提要：\n{format_timeline(request.timeline)}\n\n"
-        f"重要地点：\n{format_locations(request.locations)}\n\n"
-        f"角色信息：\n{format_characters(request.characters)}\n\n"
-        f"故事大纲：\n{request.outline}\n\n"
-        f"当前剧情内容：\n{request.currentContent}\n\n"
+        f"世界背景：{request.get('background', '')}\n\n"
+        f"前情提要：\n{format_timeline(request.get('timeline', []))}\n\n"
+        f"重要地点：\n{format_locations(request.get('locations', []))}\n\n"
+        f"角色信息：\n{format_characters(request.get('characters', []))}\n\n"
+        f"故事大纲：\n{request.get('outline', '')}\n\n"
+        f"当前剧情内容：\n{request.get('currentContent', '')}\n\n"
         f"用户的选择：\n"
-        f"选择文本：{request.selectedChoice.get('text', '')}\n"
-        f"选择效果：{request.selectedChoice.get('effect', '')}\n"
-        f"选择后内容预览：{request.selectedChoice.get('nextContent', '')}\n\n"
-        f"当前任务：请创作第{request.chapterNumber}章第{request.sceneNumber}场景的详细内容，"
+        f"选择文本：{request.get('selectedChoice', {}).get('text', '')}\n"
+        f"选择效果：{request.get('selectedChoice', {}).get('effect', '')}\n"
+        f"选择后内容预览：{request.get('selectedChoice', {}).get('nextContent', '')}\n\n"
+        f"当前任务：请创作第{request.get('chapterNumber')}章第{request.get('sceneNumber')}场景的详细内容，"
         f"要与用户的选择保持一致并自然延续，同时按照要求提供章节标题、详细内容和2-3个新的选择。"
     )
     
@@ -843,52 +850,78 @@ async def generate_next_scene(request: NextSceneRequest):
         HumanMessage(content=human_template)
     ]
     
-    try:
-        response = await chat_model.ainvoke(messages)
-        
-        # 尝试解析JSON响应
-        content = response.content
-        
-        # 处理可能的多行JSON格式问题
+    async def stream_json_content():
+        full_response = ""
         try:
-            result = json.loads(content)
-        except:
-            # 尝试提取JSON部分
-            json_match = re.search(r'(\{[\s\S]*\})', content)
-            if json_match:
-                try:
-                    result = json.loads(json_match.group(1))
-                except:
-                    # 如果仍然失败，则构造一个基本结构
+            async for chunk in chat_model.astream(messages):
+                content = chunk.content
+                content = content.replace('\n', ' ').replace('\r', ' ').strip()
+                if content:
+                    full_response += content
+                    print(f"发送流式片段: {content}")  # 调试日志
+                    yield f"data: {json.dumps({'text': content, 'done': False})}\n\n"
+            
+            # 尝试解析完整的JSON响应
+            try:
+                result = json.loads(full_response)
+            except json.JSONDecodeError as e:
+                print(f"JSON解析失败: {e}, full_response: {full_response}")
+                # 尝试提取JSON部分
+                json_match = re.search(r'\{[\s\S]*?\}', full_response)
+                if json_match:
+                    try:
+                        result = json.loads(json_match.group(0))
+                    except json.JSONDecodeError as e2:
+                        print(f"提取JSON失败: {e2}")
+                        # 构造默认结构
+                        result = {
+                            "title": f"第{request.get('chapterNumber')}章：新的发展",
+                            "content": full_response,
+                            "choices": [
+                                {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
+                                {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
+                            ]
+                        }
+                else:
+                    print("无法提取JSON，构造默认结构")
+                    # 构造默认结构
                     result = {
-                        "title": f"第{request.chapterNumber}章：新的发展",
-                        "content": content,
+                        "title": f"第{request.get('chapterNumber')}章：新的发展",
+                        "content": full_response,
                         "choices": [
                             {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
                             {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
                         ]
                     }
-            else:
-                # 构造一个基本结构
-                result = {
-                    "title": f"第{request.chapterNumber}章：新的发展",
-                    "content": content,
-                    "choices": [
-                        {"text": "继续探索", "effect": "寻找更多线索", "nextContent": "你决定继续前进..."},
-                        {"text": "谨慎行动", "effect": "保持警惕", "nextContent": "你决定更加小心地行动..."}
-                    ]
-                }
+            
+            # 保存到缓存
+            save_to_cache(cache_key, result)
+            
+            # 发送最终JSON结果（确保是字符串化的JSON）
+            yield f"data: {json.dumps({'text': json.dumps(result), 'done': True})}\n\n"
         
-        # 保存到缓存
-        save_to_cache(cache_key, result)
-        
-        return result
-    except Exception as e:
-        print(f"生成下一场景失败: {e}")
-        raise HTTPException(status_code=500, detail=f"生成下一场景失败: {str(e)}")
-
-
-
+        except Exception as e:
+            print(f"生成下一场景失败: {e}")
+            error_response = {
+                "error": f"生成下一场景失败: {str(e)}"
+            }
+            # yield f"data: {json.dumps({'text': json.dumps(error_response), 'done': True})}\n\n"
+            yield f"data: {json.dumps({'text': json.dumps(result, ensure_ascii=False), 'done': True}, ensure_ascii=False)}\n\n"
+    
+    return StreamingResponse(
+        stream_json_content(),
+        media_type="text/event-stream"
+    )
+# 新增：根据复杂度获取场景数
+def get_scenes_per_complexity(complexity: str) -> int:
+    """根据复杂度返回每章的场景数"""
+    if complexity == "simple":
+        return 2
+    elif complexity == "complex":
+        return 4
+    else:  # medium 或其他
+        return 3
+    
 class StoryEndingRequest(BaseModel):
     background: str
     timeline: list
@@ -915,7 +948,7 @@ async def generate_story_ending(request: StoryEndingRequest):
     """根据当前剧情和选择生成故事结局"""
     # 记录请求信息以便调试
     print(f"收到生成故事结局请求: chapter={request.currentChapter}, scene={request.currentScene}, complexity={request.complexity}")
-    
+
     # 构建提示模板
     system_template = (
         "你是一位专业的交互式小说作家。请根据当前剧情内容，创作整个故事的结局。\n\n"
@@ -933,13 +966,15 @@ async def generate_story_ending(request: StoryEndingRequest):
         "3. 结局应该具有转折性或悬念\n"
         "4. 返回的结局不应包含新的选择\n"
         "5. 章节标题应该简洁有吸引力\n\n"
+        "6. **必须严格返回JSON格式，且JSON语法中所有标点符号（包括逗号、引号、冒号）必须使用英文标点（如, 、\" 、:），绝对不能使用中文标点（如，、“”、：）**\n"
+        "7. 确保JSON中键值对之间用英文逗号分隔，数组元素之间也用英文逗号分隔，且最后一个元素后无多余逗号\n\n"
         "返回JSON格式：\n"
         "{\n"
         '  "title": "结局标题",\n'
         '  "content": "详细的结局描述...",\n'
         '}'
     )
-    
+
     human_template = (
         f"世界背景：{request.background}\n\n"
         f"前情提要：\n{format_timeline(request.timeline)}\n\n"
@@ -949,19 +984,19 @@ async def generate_story_ending(request: StoryEndingRequest):
         f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
         f"当前任务：请创作整个故事的结局，结局应与当前剧情和大纲保持一致，并且不应包含新的选择。"
     )
-    
+
     messages = [
         {"role": "system", "content": system_template},
         {"role": "user", "content": human_template}
     ]
-    
+
     try:
         # 模拟调用聊天模型生成内容
         response = await chat_model.ainvoke(messages)
-        
+
         # 尝试解析JSON响应
         content = response.content
-        
+
         try:
             result = json.loads(content)    
             print(f"生成的结局内容: {result}")
@@ -974,7 +1009,7 @@ async def generate_story_ending(request: StoryEndingRequest):
             #     "title": content.title,
             #     "content": content.content
             # }
-        
+
         # 返回生成的结局
         return {
             "title": "尾声: "+result.get('title', "结局标题"),
@@ -984,20 +1019,6 @@ async def generate_story_ending(request: StoryEndingRequest):
     except Exception as e:
         print(f"生成故事结局失败: {e}")
         raise HTTPException(status_code=500, detail=f"生成故事结局失败: {str(e)}")
-
-
-
-
-
-# 新增：根据复杂度获取场景数
-def get_scenes_per_complexity(complexity: str) -> int:
-    """根据复杂度返回每章的场景数"""
-    if complexity == "simple":
-        return 2
-    elif complexity == "complex":
-        return 4
-    else:  # medium 或其他
-        return 3
     
 # 启动服务器（开发环境）
 if __name__ == "__main__":
