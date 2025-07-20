@@ -943,9 +943,95 @@ def format_path_nodes(path_nodes):
     full_content = "\n".join([f"第{node.get('chapter', 1)}章 第{node.get('scene', 1)}场景: {node.get('content', '')}" for node in path_nodes])
     return full_content
 
+# @app.post("/api/generate-story-ending")
+# async def generate_story_ending(request: StoryEndingRequest):
+#     """根据当前剧情和选择生成故事结局"""
+#     # 记录请求信息以便调试
+#     print(f"收到生成故事结局请求: chapter={request.currentChapter}, scene={request.currentScene}, complexity={request.complexity}")
+
+#     # 构建提示模板
+#     system_template = (
+#         "你是一位专业的交互式小说作家。请根据当前剧情内容，创作整个故事的结局。\n\n"
+#         f"基于{request.complexity}复杂度，整个故事被划分为{request.chapterCount}章，"
+#         f"每章包含{request.scenesPerChapter}个场景。"
+#         f"当前你正在创作整个故事的结局内容，结局应当与当前剧情、角色发展以及大纲保持一致。\n\n"
+#         "请参考以下信息并结合当前已发生的剧情设计结局：\n\n"
+#         f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
+#         f"故事大纲：\n{request.outline}\n\n"
+#         f"角色信息：\n{format_characters(request.characters)}\n\n"
+#         f"世界背景：\n{request.background}\n\n"
+#         "结局应包含以下要求：\n"
+#         "1. 内容应与当前剧情、角色发展和大纲保持连贯性\n"
+#         "2. 场景应有生动的描述和角色互动\n"
+#         "3. 结局应该具有转折性或悬念\n"
+#         "4. 返回的结局不应包含新的选择\n"
+#         "5. 章节标题应该简洁有吸引力\n\n"
+#         "6. **必须严格返回JSON格式，且JSON语法中所有标点符号（包括逗号、引号、冒号）必须使用英文标点（如, 、\" 、:），绝对不能使用中文标点（如，、“”、：）**\n"
+#         "7. 确保JSON中键值对之间用英文逗号分隔，数组元素之间也用英文逗号分隔，且最后一个元素后无多余逗号\n\n"
+#         "返回JSON格式：\n"
+#         "{\n"
+#         '  "title": "结局标题",\n'
+#         '  "content": "详细的结局描述...",\n'
+#         '}'
+#     )
+
+#     human_template = (
+#         f"世界背景：{request.background}\n\n"
+#         f"前情提要：\n{format_timeline(request.timeline)}\n\n"
+#         f"重要地点：\n{format_locations(request.locations)}\n\n"
+#         f"角色信息：\n{format_characters(request.characters)}\n\n"
+#         f"故事大纲：\n{request.outline}\n\n"
+#         f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
+#         f"当前任务：请创作整个故事的结局，结局应与当前剧情和大纲保持一致，并且不应包含新的选择。"
+#     )
+
+#     messages = [
+#         {"role": "system", "content": system_template},
+#         {"role": "user", "content": human_template}
+#     ]
+
+#     try:
+#         # 模拟调用聊天模型生成内容
+#         response = await chat_model.ainvoke(messages)
+
+#         # 尝试解析JSON响应
+#         content = response.content
+
+#         try:
+#             result = json.loads(content)    
+#             print(f"生成的结局内容: {result}")
+#         except:
+#             result = {
+#                 "title": "结局：新的开始",
+#                 "content": content.content
+#             }
+#             # result = {
+#             #     "title": content.title,
+#             #     "content": content.content
+#             # }
+
+#         # 返回生成的结局
+#         return {
+#             "title": "尾声: "+result.get('title', "结局标题"),
+#             "content": result.get('content', ""),
+#             "choices": []  # 不返回新的选择
+#         }
+#     except Exception as e:
+#         print(f"生成故事结局失败: {e}")
+#         raise HTTPException(status_code=500, detail=f"生成故事结局失败: {str(e)}")
+
+
+
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
+import json
+import asyncio
+from fastapi.responses import StreamingResponse
+import json
+
 @app.post("/api/generate-story-ending")
 async def generate_story_ending(request: StoryEndingRequest):
-    """根据当前剧情和选择生成故事结局"""
+    """根据当前剧情和选择生成故事结局（流式输出）"""
     # 记录请求信息以便调试
     print(f"收到生成故事结局请求: chapter={request.currentChapter}, scene={request.currentScene}, complexity={request.complexity}")
 
@@ -971,7 +1057,7 @@ async def generate_story_ending(request: StoryEndingRequest):
         "返回JSON格式：\n"
         "{\n"
         '  "title": "结局标题",\n'
-        '  "content": "详细的结局描述...",\n'
+        '  "content": "详细的结局描述..."\n'
         '}'
     )
 
@@ -982,6 +1068,7 @@ async def generate_story_ending(request: StoryEndingRequest):
         f"角色信息：\n{format_characters(request.characters)}\n\n"
         f"故事大纲：\n{request.outline}\n\n"
         f"当前剧情内容：\n{format_path_nodes(request.pathNodes)}\n\n"
+        f"当前选择：{request.currentNode.get('choice', {}).get('text', '无选择文本')}\n\n"
         f"当前任务：请创作整个故事的结局，结局应与当前剧情和大纲保持一致，并且不应包含新的选择。"
     )
 
@@ -990,36 +1077,60 @@ async def generate_story_ending(request: StoryEndingRequest):
         {"role": "user", "content": human_template}
     ]
 
-    try:
-        # 模拟调用聊天模型生成内容
-        response = await chat_model.ainvoke(messages)
-
-        # 尝试解析JSON响应
-        content = response.content
-
+    async def stream_json_content():
+        full_response = ""
         try:
-            result = json.loads(content)    
-            print(f"生成的结局内容: {result}")
-        except:
-            result = {
-                "title": "结局：新的开始",
-                "content": content.content
-            }
-            # result = {
-            #     "title": content.title,
-            #     "content": content.content
-            # }
+            # 调用聊天模型生成内容（流式响应）
+            async for chunk in  chat_model.astream(messages):
+                content = chunk.content.replace('\n', ' ').replace('\r', ' ').strip()
 
-        # 返回生成的结局
-        return {
-            "title": "尾声: "+result.get('title', "结局标题"),
-            "content": result.get('content', ""),
-            "choices": []  # 不返回新的选择
+                if content:
+                    full_response += content
+                    print(f"发送流式片段: {content}")  # 调试日志
+
+                    # 发送流式文本片段，确保格式与前端和Node.js代理匹配
+                    yield f"data: {json.dumps({'text': content, 'done': False}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0.01)  # 确保流式传输顺畅
+
+            # 尝试解析完整的JSON响应
+            try:
+                result = json.loads(full_response)
+                if not isinstance(result, dict) or "title" not in result or "content" not in result:
+                    raise json.JSONDecodeError("Invalid JSON structure", full_response, 0)
+            except json.JSONDecodeError as e:
+                print(f"JSON解析失败: {e}, 使用默认结构")
+                result = {
+                    "title": f"第{request.currentChapter}章 结局",
+                    "content": full_response or "在关键时刻，故事迎来了意想不到的结局..."
+                }
+
+            # 确保结果符合JSON格式要求
+            final_result = {
+                "title": result.get("title", f"第{request.currentChapter}章 结局"),
+                "content": result.get("content", full_response)
+            }
+
+            # 发送最终JSON结果
+            yield f"data: {json.dumps({'text': final_result, 'done': True}, ensure_ascii=False)}\n\n"
+
+        except Exception as e:
+            print(f"生成故事结局失败: {e}")
+            error_response = {
+                "title": f"第{request.currentChapter}章 结局",
+                "content": f"生成故事结局失败: {str(e)}"
+            }
+            yield f"data: {json.dumps({'text': error_response, 'done': True}, ensure_ascii=False)}\n\n"
+
+    # 使用StreamingResponse进行流式返回
+    return StreamingResponse(
+        stream_json_content(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
         }
-    except Exception as e:
-        print(f"生成故事结局失败: {e}")
-        raise HTTPException(status_code=500, detail=f"生成故事结局失败: {str(e)}")
-    
+    )
+
 # 启动服务器（开发环境）
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)

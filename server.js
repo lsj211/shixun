@@ -151,9 +151,269 @@ function authenticateToken(req, res, next) {
     });
 }
 
+// app.post('/api/generate-story-ending', async (req, res) => {
+//     try {
+//         // 提取请求参数（严格校验必填项）
+//         const {
+//             background,
+//             timeline,
+//             locations,
+//             characters,
+//             complexity,
+//             chapterCount,
+//             scenesPerChapter,
+//             outline,
+//             pathNodes,
+//             currentNode,
+//             currentChapter,
+//             currentScene,
+//             isFinalEnding
+//         } = req.body;
+
+//         // 验证核心必填字段（与Python后端约定）
+//         if (!background || !timeline || !locations || !characters || !outline) {
+//             return res.status(400).json({ error: '缺少背景、时间线、地点、角色或大纲等必填字段' });
+//         }
+
+//         // 生成缓存键（参考标题接口的哈希策略，确保唯一性）
+//         const cacheKey = `story_ending_${createHash('md5')
+//             .update(outline.substring(0, 50)) // 取大纲前50字做哈希
+//             .digest('hex')}_${currentChapter}_${currentScene}`;
+
+//         // 优先从缓存读取
+//         const cachedEnding = await getFromCache(cacheKey);
+//         if (cachedEnding) {
+//             console.log('结局缓存命中，直接返回');
+//             return res.json(cachedEnding);
+//         }
+
+//         try {
+//             // 转发请求到Python后端（保持与标题接口一致的URL格式）
+//             const pythonResponse = await axios.post(
+//                 `${PYTHON_API_URL}/api/generate-story-ending`, 
+//                 req.body // 完整转发前端请求体
+//             );
+
+//             // 严格校验Python返回格式（必须包含title和content）
+//             if (!pythonResponse.data || !pythonResponse.data.title || !pythonResponse.data.content) {
+//                 console.error('Python后端返回格式异常:', pythonResponse.data);
+//                 return res.status(500).json({ error: 'Python后端返回数据异常，缺少标题或内容' });
+//             }
+
+//             // 构造标准结局结构（确保无选择项）
+//             const storyEnding = {
+//                 title: pythonResponse.data.title,
+//                 content: pythonResponse.data.content,
+//                 choices: [], // 结局固定无后续选择
+//                 parentId: currentNode?.id || '', // 兼容currentNode.id可能不存在的情况
+//                 chapter: currentChapter,
+//                 scene: scenesPerChapter, // 结局作为章节最后场景
+//                 isEnding: true
+//             };
+
+//             // 缓存结果（后续相同请求可直接复用）
+//             await saveToCache(cacheKey, storyEnding);
+
+//             // 返回最终响应
+//             return res.json(storyEnding);
+
+//         } catch (apiError) {
+//             // 精细化处理Python后端的错误（区分网络/状态码/业务错误）
+//             console.error('Python后端请求失败:', apiError.message);
+//             const statusCode = apiError.response?.status || 500;
+//             const errorMessage = apiError.response?.data?.error || 'Python后端处理失败';
+//             return res.status(statusCode).json({ error: errorMessage });
+//         }
+
+//     } catch (error) {
+//         // 捕获Node.js层异常（如缓存操作失败）
+//         console.error('生成故事结局失败（Node层）:', error);
+//         res.status(500).json({ error: error.message || '服务器内部错误' });
+//     }
+// });
+
+// const axios = require('axios');
+// const { createHash } = require('crypto');
+
+// app.post('/api/generate-story-ending', async (req, res) => {
+//     try {
+//         // 提取请求参数（严格校验必填项）
+//         const {
+//             background,
+//             timeline,
+//             locations,
+//             characters,
+//             complexity,
+//             chapterCount,
+//             scenesPerChapter,
+//             outline,
+//             pathNodes,
+//             currentNode,
+//             currentChapter,
+//             currentScene,
+//             isFinalEnding
+//         } = req.body;
+
+//         // 验证核心必填字段（与Python后端约定）
+//         if (!background || !timeline || !locations || !characters || !outline) {
+//             return res.status(400).json({ error: '缺少背景、时间线、地点、角色或大纲等必填字段' });
+//         }
+
+//         // 生成缓存键（参考标题接口的哈希策略，确保唯一性）
+//         const cacheKey = `story_ending_${createHash('md5')
+//             .update(outline.substring(0, 50)) // 取大纲前50字做哈希
+//             .digest('hex')}_${currentChapter}_${currentScene}`;
+
+//         // 优先从缓存读取
+//         const cachedEnding = await getFromCache(cacheKey);
+//         if (cachedEnding) {
+//             console.log('结局缓存命中，直接返回');
+//             return res.json(cachedEnding);
+//         }
+
+//         // 设置流式响应头
+//         res.setHeader('Content-Type', 'text/event-stream');
+//         res.setHeader('Cache-Control', 'no-cache');
+//         res.setHeader('Connection', 'keep-alive');
+        
+//         // 响应的初始数据
+//         res.write('data: {"text": "生成结局中...", "done": false}\n\n');
+
+//         try {
+//             // 转发请求到Python后端（保持与标题接口一致的URL格式）
+//             const pythonResponse = await axios.post(
+//                 `${PYTHON_API_URL}/api/generate-story-ending`, 
+//                 req.body // 完整转发前端请求体
+//             );
+
+//             // 严格校验Python返回格式（必须包含title和content）
+//             if (!pythonResponse.data || !pythonResponse.data.title || !pythonResponse.data.content) {
+//                 console.error('Python后端返回格式异常:', pythonResponse.data);
+//                 return res.status(500).json({ error: 'Python后端返回数据异常，缺少标题或内容' });
+//             }
+
+//             // 构造标准结局结构（确保无选择项）
+//             const storyEnding = {
+//                 title: pythonResponse.data.title,
+//                 content: pythonResponse.data.content,
+//                 choices: [], // 结局固定无后续选择
+//                 parentId: currentNode?.id || '', // 兼容currentNode.id可能不存在的情况
+//                 chapter: currentChapter,
+//                 scene: scenesPerChapter, // 结局作为章节最后场景
+//                 isEnding: true
+//             };
+
+//             // 缓存结果（后续相同请求可直接复用）
+//             await saveToCache(cacheKey, storyEnding);
+
+//             // 流式输出完整内容
+//             res.write(`data: ${JSON.stringify({ text: storyEnding.content, done: true })}\n\n`);
+            
+//             // 结束流式响应
+//             res.end();
+
+//         } catch (apiError) {
+//             // 精细化处理Python后端的错误（区分网络/状态码/业务错误）
+//             console.error('Python后端请求失败:', apiError.message);
+//             const statusCode = apiError.response?.status || 500;
+//             const errorMessage = apiError.response?.data?.error || 'Python后端处理失败';
+//             return res.status(statusCode).json({ error: errorMessage });
+//         }
+
+//     } catch (error) {
+//         // 捕获Node.js层异常（如缓存操作失败）
+//         console.error('生成故事结局失败（Node层）:', error);
+//         res.status(500).json({ error: error.message || '服务器内部错误' });
+//     }
+// });
+
+// app.post('/api/generate-story-ending', async (req, res) => {
+//     try {
+//         // 提取请求参数
+//         const {
+//             background,
+//             timeline,
+//             locations,
+//             characters,
+//             complexity,
+//             chapterCount,
+//             scenesPerChapter,
+//             outline,
+//             pathNodes,
+//             currentNode,
+//             currentChapter,
+//             currentScene,
+//             isFinalEnding
+//         } = req.body;
+
+//         // 校验必填项
+//         if (!background || !timeline || !locations || !characters || !outline) {
+//             return res.status(400).json({ error: '缺少背景、时间线、地点、角色或大纲等必填字段' });
+//         }
+
+//         // 生成缓存键
+//         const cacheKey = `story_ending_${createHash('md5')
+//             .update(outline.substring(0, 50)) // 取大纲前50字做哈希
+//             .digest('hex')}_${currentChapter}_${currentScene}`;
+
+//         // 优先从缓存读取
+//         const cachedEnding = await getFromCache(cacheKey);
+//         if (cachedEnding) {
+//             console.log('结局缓存命中，直接返回');
+//             return res.json(cachedEnding);
+//         }
+
+//         // 设置流式响应头
+//         res.setHeader('Content-Type', 'text/event-stream');
+//         res.setHeader('Cache-Control', 'no-cache');
+//         res.setHeader('Connection', 'keep-alive');
+        
+//         // 响应初始数据
+//         res.write('data: {"text": "生成结局中...", "done": false}\n\n');
+
+//         try {
+//             // 转发请求到Python后端
+//             const pythonResponse = await axios.post(
+//                 `${PYTHON_API_URL}/api/generate-story-ending`, 
+//                 req.body
+//             );
+
+//             const storyEnding = {
+//                 title: pythonResponse.data.title,
+//                 content: pythonResponse.data.content,
+//                 choices: [], // 结局固定无后续选择
+//                 parentId: currentNode?.id || '',
+//                 chapter: currentChapter,
+//                 scene: scenesPerChapter,
+//                 isEnding: true
+//             };
+
+//             // 缓存结果
+//             await saveToCache(cacheKey, storyEnding);
+
+//             // 流式输出完整内容
+//             res.write(`data: ${JSON.stringify({ text: storyEnding.content, done: true })}\n\n`);
+
+//             // 结束流式响应
+//             res.end();
+
+//         } catch (apiError) {
+//             console.error('Python后端请求失败:', apiError.message);
+//             res.write('data: {"text": "Python后端请求失败", "done": true}\n\n');
+//             res.end();
+//         }
+
+//     } catch (error) {
+//         console.error('生成故事结局失败（Node层）:', error);
+//         res.status(500).json({ error: error.message || '服务器内部错误' });
+//     }
+// });
+
+
+
 app.post('/api/generate-story-ending', async (req, res) => {
     try {
-        // 提取请求参数（严格校验必填项）
+        // 提取请求参数
         const {
             background,
             timeline,
@@ -170,67 +430,124 @@ app.post('/api/generate-story-ending', async (req, res) => {
             isFinalEnding
         } = req.body;
 
-        // 验证核心必填字段（与Python后端约定）
-        if (!background || !timeline || !locations || !characters || !outline) {
-            return res.status(400).json({ error: '缺少背景、时间线、地点、角色或大纲等必填字段' });
+        // 校验必填项
+        if (!background || !timeline || !locations || !characters || !outline || !currentNode || !currentNode.choice) {
+            return res.status(400).json({ error: '缺少背景、时间线、地点、角色、大纲、当前节点或选择等必填字段' });
         }
 
-        // 生成缓存键（参考标题接口的哈希策略，确保唯一性）
+        // 生成缓存键
         const cacheKey = `story_ending_${createHash('md5')
             .update(outline.substring(0, 50)) // 取大纲前50字做哈希
-            .digest('hex')}_${currentChapter}_${currentScene}`;
+            .digest('hex')}_${currentChapter}_${currentScene}_${currentNode.choice.text || 'no-choice'}`;
 
         // 优先从缓存读取
         const cachedEnding = await getFromCache(cacheKey);
         if (cachedEnding) {
             console.log('结局缓存命中，直接返回');
-            return res.json(cachedEnding);
+            res.setHeader('Content-Type', 'text/event-stream');
+            res.setHeader('Cache-Control', 'no-cache');
+            res.setHeader('Connection', 'keep-alive');
+            res.write(`data: ${JSON.stringify({ text: cachedEnding.content, done: true })}\n\n`);
+            res.end();
+            return;
         }
 
+        // 设置流式响应头
+        res.setHeader('Content-Type', 'text/event-stream');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.setHeader('Connection', 'keep-alive');
+
+        // 响应初始数据
+        res.write('data: {"text": "生成结局中...", "done": false}\n\n');
+
         try {
-            // 转发请求到Python后端（保持与标题接口一致的URL格式）
+            // 转发请求到Python后端（假设后端支持流式响应）
             const pythonResponse = await axios.post(
-                `${PYTHON_API_URL}/api/generate-story-ending`, 
-                req.body // 完整转发前端请求体
+                `${PYTHON_API_URL}/api/generate-story-ending`,
+                req.body,
+                { responseType: 'stream' } // 配置axios以处理流式响应
             );
 
-            // 严格校验Python返回格式（必须包含title和content）
-            if (!pythonResponse.data || !pythonResponse.data.title || !pythonResponse.data.content) {
-                console.error('Python后端返回格式异常:', pythonResponse.data);
-                return res.status(500).json({ error: 'Python后端返回数据异常，缺少标题或内容' });
-            }
-
-            // 构造标准结局结构（确保无选择项）
+            let fullContent = '';
             const storyEnding = {
-                title: pythonResponse.data.title,
-                content: pythonResponse.data.content,
+                title: `第${currentChapter}章 结局`,
+                content: '',
                 choices: [], // 结局固定无后续选择
-                parentId: currentNode?.id || '', // 兼容currentNode.id可能不存在的情况
+                parentId: currentNode.id || '',
                 chapter: currentChapter,
-                scene: scenesPerChapter, // 结局作为章节最后场景
+                scene: scenesPerChapter,
                 isEnding: true
             };
 
-            // 缓存结果（后续相同请求可直接复用）
-            await saveToCache(cacheKey, storyEnding);
+            // 处理Python后端的流式响应
+            pythonResponse.data.on('data', (chunk) => {
+                const chunkStr = chunk.toString();
+                const lines = chunkStr.split('\n');
+                for (const line of lines) {
+                    if (line.startsWith('data: ')) {
+                        const dataStr = line.slice(6).trim();
+                        if (!dataStr) continue;
+                        try {
+                            const data = JSON.parse(dataStr);
+                            if (data.done) {
+                                storyEnding.content = fullContent;
+                                storyEnding.title = data.title || storyEnding.title;
+                                // 缓存结果
+                                saveToCache(cacheKey, storyEnding).catch((err) =>
+                                    console.error('缓存保存失败:', err)
+                                );
+                                // 发送最终数据
+                                res.write(`data: ${JSON.stringify({ text: fullContent, done: true })}\n\n`);
+                                res.end();
+                            } else {
+                                fullContent += data.text;
+                                // 转发流式数据到客户端
+                                res.write(`data: ${JSON.stringify({ text: data.text, done: false })}\n\n`);
+                            }
+                        } catch (e) {
+                            console.warn('无法解析Python后端SSE数据:', dataStr, e);
+                            fullContent += dataStr;
+                            res.write(`data: ${JSON.stringify({ text: dataStr, done: false })}\n\n`);
+                        }
+                    }
+                }
+            });
 
-            // 返回最终响应
-            return res.json(storyEnding);
+            pythonResponse.data.on('error', (err) => {
+                console.error('Python后端流式响应错误:', err);
+                res.write('data: {"text": "Python后端流式响应错误", "done": true}\n\n');
+                res.end();
+            });
+
+            pythonResponse.data.on('end', () => {
+                if (!res.writableEnded) {
+                    storyEnding.content = fullContent;
+                    // 缓存结果
+                    saveToCache(cacheKey, storyEnding).catch((err) =>
+                        console.error('缓存保存失败:', err)
+                    );
+                    res.write(`data: ${JSON.stringify({ text: fullContent, done: true })}\n\n`);
+                    res.end();
+                }
+            });
 
         } catch (apiError) {
-            // 精细化处理Python后端的错误（区分网络/状态码/业务错误）
             console.error('Python后端请求失败:', apiError.message);
-            const statusCode = apiError.response?.status || 500;
-            const errorMessage = apiError.response?.data?.error || 'Python后端处理失败';
-            return res.status(statusCode).json({ error: errorMessage });
+            res.write('data: {"text": "Python后端请求失败", "done": true}\n\n');
+            res.end();
         }
 
     } catch (error) {
-        // 捕获Node.js层异常（如缓存操作失败）
         console.error('生成故事结局失败（Node层）:', error);
-        res.status(500).json({ error: error.message || '服务器内部错误' });
+        if (!res.headersSent) {
+            res.status(500).json({ error: error.message || '服务器内部错误' });
+        } else {
+            res.write('data: {"text": "服务器内部错误", "done": true}\n\n');
+            res.end();
+        }
     }
 });
+
 
 // 受保护接口示例
 app.get('/api/protected', authenticateToken, async (req, res) => {

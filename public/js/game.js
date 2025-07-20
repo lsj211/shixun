@@ -402,7 +402,7 @@ function handleChoiceClick(event) {
         
         // 清除回溯标记
         gameState.lastRevertedNodeId = null;
-        
+        document.getElementById('storyText').textContent = newContent.content;
         // 更新进度条
         updateChapterProgress();
     }).catch(error => {
@@ -556,6 +556,7 @@ async function generateStoryEnding(currentChoice) {
 }
 
 
+
 async function generateStoryEndingStreaming(currentChoice) {
     try {
         // 收集游戏数据
@@ -603,7 +604,7 @@ async function generateStoryEndingStreaming(currentChoice) {
             isFinalEnding: true
         };
 
-        console.log("发送到API的结局请求数据:", {
+        console.log("发送到API的请求数据:", {
             complexity: requestData.complexity,
             chapterCount: requestData.chapterCount,
             pathLength: pathNodes.length,
@@ -616,11 +617,11 @@ async function generateStoryEndingStreaming(currentChoice) {
         let contentContainer = document.getElementById('storyText');
         let streamingIndicator = null;
 
-        // 防御性检查：如果容器不存在，创建临时容器
+        // 防御性检查：如果storyText不存在，创建临时容器
         if (!contentContainer) {
-            console.warn('未找到storyText元素，创建临时结局容器');
+            console.warn('未找到storyText元素，创建临时容器');
             contentContainer = document.createElement('div');
-            contentContainer.id = 'storyEnding';
+            contentContainer.id = 'storyText';
             contentContainer.style.minHeight = '100px';
             contentContainer.style.padding = '10px';
             contentContainer.style.overflowY = 'auto';
@@ -629,13 +630,13 @@ async function generateStoryEndingStreaming(currentChoice) {
 
         // 创建流式内容指示器
         streamingIndicator = document.createElement('div');
-        streamingIndicator.id = 'endingStreamingIndicator';
+        streamingIndicator.id = 'streamingIndicator';
         streamingIndicator.textContent = '正在生成结局...';
         streamingIndicator.style.color = '#666';
         streamingIndicator.style.fontStyle = 'italic';
         contentContainer.appendChild(streamingIndicator);
 
-        // 发起流式请求
+        // 使用fetch处理SSE
         const response = await fetch('/api/generate-story-ending', {
             method: 'POST',
             headers: {
@@ -645,8 +646,7 @@ async function generateStoryEndingStreaming(currentChoice) {
         });
 
         if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`API响应错误: ${response.status}, ${errorText}`);
+            throw new Error(`API响应错误: ${response.status} ${response.statusText}`);
         }
 
         const reader = response.body.getReader();
@@ -659,83 +659,80 @@ async function generateStoryEndingStreaming(currentChoice) {
                     while (true) {
                         const { done, value } = await reader.read();
                         if (done) {
-                            // 移除流式指示器
                             if (streamingIndicator && streamingIndicator.parentNode) {
                                 streamingIndicator.remove();
                             }
-
-                            // 解析最终结局数据
+                            // 解析最终的JSON响应
                             let result;
                             try {
                                 result = JSON.parse(fullResponse);
                             } catch (e) {
-                                console.warn('无法解析结局JSON:', e, 'fullResponse:', fullResponse);
-                                // 尝试提取有效JSON部分
+                                console.warn('无法解析完整JSON:', e, 'fullResponse:', fullResponse);
+                                // 尝试提取JSON部分
                                 const jsonMatch = fullResponse.match(/(\{[\s\S]*?\})/);
                                 if (jsonMatch) {
                                     try {
                                         result = JSON.parse(jsonMatch[1]);
                                     } catch (e2) {
-                                        console.warn('提取的JSON仍无法解析，使用原始文本:', e2);
+                                        console.warn('无法解析提取的JSON，构造默认结构:', e2);
                                         result = {
-                                            title: "故事结局",
-                                            content: fullResponse
+                                            title: `第${currentChapter}章 结局`,
+                                            content: fullResponse,
+                                            choices: []
                                         };
                                     }
                                 } else {
+                                    console.warn('无法提取JSON，构造默认结构');
                                     result = {
-                                        title: "故事结局",
-                                        content: fullResponse
+                                        title: `第${currentChapter}章 结局`,
+                                        content: fullResponse,
+                                        choices: []
                                     };
                                 }
                             }
 
-                            // 构建结局节点
+                            // 构造结局节点
                             const storyEnding = {
                                 id: 'ending-' + Date.now(),
                                 title: result.title || `第${currentChapter}章 结局`,
                                 content: result.content || fullResponse,
-                                choices: [], // 结局无选择项
+                                choices: result.choices || [],
                                 parentId: currentStoryNode.id,
                                 chapter: currentChapter,
-                                scene: scenesPerChapter,
+                                scene: scenesPerChapter, // 结局通常是本章最后一个场景
                                 isEnding: true
                             };
 
-                            console.log("生成的完整故事结局:", storyEnding);
-                            
-                            // 更新当前节点为结局
-                            currentStoryNode = storyEnding;
+                            console.log("生成的故事结局:", storyEnding);
+                            currentStoryNode = storyEnding; // 更新当前节点为结局节点
                             resolve(storyEnding);
                             break;
                         }
 
-                        // 处理流式数据
+                        // 解码流式数据
                         const chunk = decoder.decode(value, { stream: true });
                         const lines = chunk.split('\n');
-                        
                         for (const line of lines) {
                             if (line.startsWith('data: ')) {
                                 const dataStr = line.slice(6).trim();
                                 if (!dataStr) continue;
-                                
                                 try {
                                     const data = JSON.parse(dataStr);
                                     if (data.done) {
-                                        // 保存最终完整数据
+                                        // 保存最终JSON数据
                                         fullResponse = typeof data.text === 'string' ? data.text : JSON.stringify(data.text);
                                         continue;
                                     }
-                                    // 累积并实时更新内容
+                                    // 实时更新内容
                                     fullResponse += data.text;
-                                    // 强制DOM更新
+                                    // 强制触发DOM更新
                                     requestAnimationFrame(() => {
                                         contentContainer.innerHTML = `<p>${fullResponse}</p>`;
-                                        contentContainer.scrollTop = contentContainer.scrollHeight; // 自动滚动到底部
+                                        contentContainer.scrollTop = contentContainer.scrollHeight;
                                     });
                                 } catch (e) {
-                                    console.warn('SSE数据解析失败，按文本处理:', dataStr, e);
-                                    // 直接作为文本内容处理
+                                    console.warn('无法解析SSE数据:', dataStr, e);
+                                    // 假设非JSON数据是文本内容，累积并显示
                                     fullResponse += dataStr;
                                     requestAnimationFrame(() => {
                                         contentContainer.innerHTML = `<p>${fullResponse}</p>`;
@@ -746,7 +743,7 @@ async function generateStoryEndingStreaming(currentChoice) {
                         }
                     }
                 } catch (error) {
-                    console.error('结局流式处理失败:', error);
+                    console.error('处理流式数据失败:', error);
                     if (streamingIndicator && streamingIndicator.parentNode) {
                         streamingIndicator.remove();
                     }
@@ -757,11 +754,9 @@ async function generateStoryEndingStreaming(currentChoice) {
             readStream();
         });
     } catch (error) {
-        console.error('生成故事结局失败:', error);
-        // 清理指示器
-        const indicator = document.getElementById('endingStreamingIndicator');
-        if (indicator && indicator.parentNode) {
-            indicator.remove();
+        console.error('通过API生成故事结局失败:', error);
+        if (typeof streamingIndicator !== 'undefined' && streamingIndicator && streamingIndicator.parentNode) {
+            streamingIndicator.remove();
         }
         throw error;
     }
