@@ -233,7 +233,7 @@ function initializeGame() {
 }
 
 // 更新故事显示
-function updateStoryDisplay(node) {
+async function updateStoryDisplay(node) {
     //更新小说标题
     document.getElementById('storyTitle').textContent = gameState.title;
 
@@ -244,8 +244,14 @@ function updateStoryDisplay(node) {
     // 更新章节信息
     document.getElementById('currentChapter').textContent = node.title;
     
-    // 生成新的场景图片
-    regenerateImage(node.content);
+    // 等待图片生成
+    try {
+        await generateSceneImage(node.content);
+    } catch (error) {
+        console.error('更新图片失败:', error);
+        document.getElementById('storyImage').src = 'test.png';
+    }
+    
     
     // 将节点添加到剧情树
     addToStoryTree(node);
@@ -290,7 +296,7 @@ function updateChoices(choices) {
     });
 }
 
-function handleChoiceClick(event) {
+async function handleChoiceClick(event) {
     const button = event.currentTarget;
     const choiceIndex = parseInt(button.dataset.choiceIndex);
     
@@ -391,34 +397,54 @@ function handleChoiceClick(event) {
     // updateChoices(tempNode.choices); // 清空选择按钮
 
     // 异步生成下一段剧情并流式更新
-    generateNextContentFromAPI(currentChoice).then(newContent => {
-        // 更新临时节点为最终节点
+    try {
+        const newContent = await generateNextContentFromAPI(currentChoice);
         currentStoryNode = newContent;
-        updateStoryWithNewContent(newContent);
-        
-        // 隐藏加载状态
+        await updateStoryWithNewContent(newContent);
         document.getElementById('loadingIndicator').classList.add('hidden');
         document.querySelector('.choices-container').classList.remove('disabled');
-        
-        // 清除回溯标记
         gameState.lastRevertedNodeId = null;
-        document.getElementById('storyText').textContent = newContent.content;
-        // 更新进度条
         updateChapterProgress();
-    }).catch(error => {
+    } catch (error) {
         console.error('生成下一段剧情失败:', error);
-        // 恢复UI状态
         document.getElementById('loadingIndicator').classList.add('hidden');
         document.querySelector('.choices-container').classList.remove('disabled');
-        // 使用简单生成作为备选方案
-        generateNextContent(currentChoice).then(simpleContent => {
-            simpleContent.chapter = calculateNextChapter(currentStoryNode);
-            simpleContent.scene = calculateNextScene(currentStoryNode);
-            currentStoryNode = simpleContent;
-            updateStoryWithNewContent(simpleContent);
-            updateChapterProgress();
-        });
-    });
+        const simpleContent = await generateNextContent(currentChoice);
+        simpleContent.chapter = calculateNextChapter(currentStoryNode);
+        simpleContent.scene = calculateNextScene(currentStoryNode);
+        currentStoryNode = simpleContent;
+        await updateStoryWithNewContent(simpleContent);
+        updateChapterProgress();
+    }
+
+    // generateNextContentFromAPI(currentChoice).then(newContent => {
+    //     // 更新临时节点为最终节点
+    //     currentStoryNode = newContent;
+    //     updateStoryWithNewContent(newContent);
+        
+    //     // 隐藏加载状态
+    //     document.getElementById('loadingIndicator').classList.add('hidden');
+    //     document.querySelector('.choices-container').classList.remove('disabled');
+        
+    //     // 清除回溯标记
+    //     gameState.lastRevertedNodeId = null;
+    //     document.getElementById('storyText').textContent = newContent.content;
+    //     // 更新进度条
+    //     updateChapterProgress();
+    // }).catch(error => {
+    //     console.error('生成下一段剧情失败:', error);
+    //     // 恢复UI状态
+    //     document.getElementById('loadingIndicator').classList.add('hidden');
+    //     document.querySelector('.choices-container').classList.remove('disabled');
+    //     // 使用简单生成作为备选方案
+    //     generateNextContent(currentChoice).then(simpleContent => {
+    //         simpleContent.chapter = calculateNextChapter(currentStoryNode);
+    //         simpleContent.scene = calculateNextScene(currentStoryNode);
+    //         currentStoryNode = simpleContent;
+    //         updateStoryWithNewContent(simpleContent);
+    //         updateChapterProgress();
+    //     });
+    // });
     
     console.log("选择后已探索节点:", Array.from(gameState.exploredNodes));
 }
@@ -1168,7 +1194,7 @@ function generateSpecificChoices(currentContent, keywords) {
 }
 
 // 修改更新故事内容的函数，记录新节点ID和路径，维护父子关系
-function updateStoryWithNewContent(newContent) {
+async function updateStoryWithNewContent(newContent) {
     const parentNodeId = currentStoryNode.parentId;
     console.log("更新后的当前节点:", newContent);
 
@@ -1183,7 +1209,7 @@ function updateStoryWithNewContent(newContent) {
     updateStoryTreeStructure(parentNodeId, newContent);
 
     // 更新显示
-    updateStoryDisplay(newContent);
+    await updateStoryDisplay(newContent);
     updateChoices(newContent.choices);
 
     // 更新侧边栏剧情树
@@ -1229,8 +1255,8 @@ function updateStoryTreeStructure(parentNodeId, childNode) {
 function addToStoryTree(node) {
     const treeContainer = document.getElementById('storyTree');
     const nodeElement = document.createElement('div');
-    nodeElement.className = 'tree-node';
-    nodeElement.textContent = node.title;
+    // nodeElement.className = 'tree-node';
+    // nodeElement.textContent = node.title;
     treeContainer.appendChild(nodeElement);
 }
 
@@ -1417,13 +1443,13 @@ function updateStoryInfoContent() {
 
 
 // 更新角色设定内容
-function updateCharacterInfoContent() {
+// 更新角色设定内容
+async function updateCharacterInfoContent() {
     const characterGrid = document.getElementById('characterGrid');
     
     // 添加AI生成按钮
     const container = document.querySelector('#characterInfoModal .modal-content');
     
-    // 检查是否已经添加过按钮
     if (!container.querySelector('.generate-characters-btn')) {
         const generateButton = document.createElement('button');
         generateButton.className = 'generate-characters-btn';
@@ -1436,18 +1462,17 @@ function updateCharacterInfoContent() {
         generateButton.style.margin = '10px 0';
         generateButton.style.cursor = 'pointer';
         
-        // 将按钮插入到内容之前
         container.insertBefore(generateButton, container.firstChild);
         
-        // 添加按钮点击事件
-        generateButton.addEventListener('click', () => {
-            generateCharactersContent();
+        generateButton.addEventListener('click', async () => {
+            await generateCharactersContent();
         });
     }
     
+    // 更新角色卡片
     characterGrid.innerHTML = gameState.characters.map(char => `
         <div class="character-info-card">
-            <img class="character-info-image" src="test.png" alt="${char.name}">
+            <img class="character-info-image" id="character-image-${char.name}" src="test.png" alt="${char.name}">
             <div class="character-info-details">
                 <h3>${char.name}</h3>
                 <p>${char.description}</p>
@@ -1457,6 +1482,12 @@ function updateCharacterInfoContent() {
             </div>
         </div>
     `).join('');
+
+    for (const char of gameState.characters) {
+    if (!char.image || char.image === 'test.png') {
+        generateCharacterImage(char);
+    }
+}
 }
 
 // 添加生成背景和角色内容的函数
@@ -1937,10 +1968,11 @@ function extractLocationsFromBackground(backgroundText) {
 }
 
 // 生成角色内容 - 修改为使用当前存档
+// 生成角色内容 - 修改为使用当前存档
 async function generateCharactersContent() {
     const characterGrid = document.getElementById('characterGrid');
     const originalContent = characterGrid.innerHTML;
-    
+
     // 创建流式显示容器
     const streamContainer = document.createElement('div');
     streamContainer.className = 'stream-container';
@@ -1952,7 +1984,7 @@ async function generateCharactersContent() {
     streamContainer.style.margin = '10px 0';
     streamContainer.style.maxHeight = '300px';
     streamContainer.style.overflowY = 'auto';
-    
+
     // 添加取消按钮
     const cancelBtn = document.createElement('button');
     cancelBtn.textContent = '取消生成';
@@ -1966,21 +1998,21 @@ async function generateCharactersContent() {
     cancelBtn.style.padding = '5px 10px';
     cancelBtn.style.cursor = 'pointer';
     streamContainer.appendChild(cancelBtn);
-    
+
     // 添加内容区域
     const streamContent = document.createElement('div');
     streamContent.className = 'stream-content';
     streamContent.textContent = '正在生成角色详情...';
     streamContainer.appendChild(streamContent);
-    
+
     // 替换原始内容区域
-    characterGrid.style.display = 'none';
+    characterGrid.style.display = ''; // 保持角色区显示，不隐藏
     characterGrid.parentNode.insertBefore(streamContainer, characterGrid);
-    
+
     // 获取当前存档键
     const urlParams = new URLSearchParams(window.location.search);
     const archiveKey = urlParams.get('archive') || localStorage.getItem('gameSettings_current');
-    
+
     // 从当前存档获取游戏设置
     let gameSettings;
     try {
@@ -1997,25 +2029,25 @@ async function generateCharactersContent() {
         gameSettings = {};
         console.error('解析游戏设置失败:', e);
     }
-    
+
     // 准备请求数据
     const requestData = {
         background: gameSettings.background || currentStoryNode.content || '一个神秘的世界',
         complexity: gameSettings.complexity || 'medium',
         characterCount: gameState.characters.length || 3
     };
-    
+
     // 创建AbortController用于取消请求
     const controller = new AbortController();
     const signal = controller.signal;
-    
+
     // 取消按钮事件
     cancelBtn.addEventListener('click', () => {
         controller.abort();
         streamContainer.remove();
         characterGrid.style.display = '';
     });
-    
+
     try {
         // 调用API获取角色
         const response = await fetch('/api/generate-characters', {
@@ -2026,58 +2058,58 @@ async function generateCharactersContent() {
             body: JSON.stringify(requestData),
             signal: signal
         });
-        
+
         // 检查响应类型，是否为SSE流
         const contentType = response.headers.get('Content-Type');
-        
+
         // 处理流式响应
         if (contentType && contentType.includes('text/event-stream')) {
             // 是流式响应，需要逐行处理
             console.log("收到角色生成的SSE流响应");
-            
+
             if (!response.body) {
                 throw new Error('浏览器不支持ReadableStream');
             }
-            
+
             const reader = response.body.getReader();
             const decoder = new TextDecoder('utf-8');
             let completeCharactersData = '';
             let buffer = '';
             let characters = [];
-            
+
             while (true) {
                 const { done, value } = await reader.read();
-                
+
                 if (done) {
                     console.log("SSE流读取完成");
                     break;
                 }
-                
+
                 // 解码收到的数据
                 const chunk = decoder.decode(value, { stream: true });
                 buffer += chunk;
-                
+
                 // 处理缓冲区中的完整行
                 const lines = buffer.split('\n');
                 buffer = lines.pop() || '';
-                
+
                 for (const line of lines) {
                     if (line.trim() === '') continue;
-                    
+
                     if (line.startsWith('data: ')) {
                         try {
                             const eventData = JSON.parse(line.substring(6));
-                            
+
                             if (eventData.text) {
                                 completeCharactersData += eventData.text;
                                 streamContent.textContent = '接收角色数据中...\n' + completeCharactersData.substring(0, 200) + '...';
                             }
-                            
+
                             // 如果有角色数据，则提取
                             if (eventData.characters) {
                                 characters = eventData.characters;
                             }
-                            
+
                             if (eventData.done) {
                                 console.log("收到流结束标记");
                             }
@@ -2087,7 +2119,7 @@ async function generateCharactersContent() {
                     }
                 }
             }
-            
+
             // 如果在流中获取到角色数据，直接使用
             if (characters.length === 0) {
                 // 尝试从完整数据中提取角色
@@ -2108,10 +2140,10 @@ async function generateCharactersContent() {
             if (!response.ok) {
                 throw new Error(`API请求失败: ${response.status}`);
             }
-            
+
             const responseText = await response.text();
             let data;
-            
+
             try {
                 // 尝试处理可能包含"data:"前缀的响应
                 if (responseText.startsWith('data: ')) {
@@ -2124,47 +2156,52 @@ async function generateCharactersContent() {
                 console.error("解析JSON失败:", parseError, responseText);
                 throw parseError;
             }
-            
+
             if (data && data.characters && Array.isArray(data.characters)) {
                 characters = data.characters;
             } else {
                 throw new Error('API未返回有效的角色数据');
             }
         }
-        
+
         // 成功获取角色数据
-        if (characters && characters.length > 0) {
-            // 更新游戏状态中的角色
-            gameState.characters = characters.map((char, index) => {
-                // 保留现有角色的图片
-                const existingImage = gameState.characters[index] ? gameState.characters[index].image : null;
-                
-                return {
-                    name: char.name,
-                    description: char.description,
-                    image: existingImage || 'test.png',
-                    traits: extractCharacterTraits(char.description)
-                };
-            });
-            
-            // 更新显示
-            characterGrid.innerHTML = gameState.characters.map(char => `
-                <div class="character-info-card">
-                    <img class="character-info-image" src="${char.image}" alt="${char.name}">
-                    <div class="character-info-details">
-                        <h3>${char.name}</h3>
-                        <p>${char.description}</p>
-                        <div class="character-traits">
-                            ${generateCharacterTraits(char)}
-                        </div>
+    if (characters && characters.length > 0) {
+        // 更新游戏状态中的角色
+        gameState.characters = characters.map((char, index) => {
+            // 保留现有角色的图片
+            const existingImage = gameState.characters[index] ? gameState.characters[index].image : null;
+            return {
+                name: char.name,
+                description: char.description,
+                image: existingImage || 'test.png',
+                traits: extractCharacterTraits(char.description)
+            };
+        });
+
+        // 更新显示
+        characterGrid.innerHTML = gameState.characters.map(char => `
+            <div class="character-info-card">
+                <img class="character-info-image" id="character-image-${char.name}" src="${char.image || 'test.png'}" alt="${char.name}">
+                <div class="character-info-details">
+                    <h3>${char.name}</h3>
+                    <p>${char.description}</p>
+                    <div class="character-traits">
+                        ${generateCharacterTraits(char)}
                     </div>
                 </div>
-            `).join('');
-            
-            // 显示角色网格
-            characterGrid.style.display = '';
-            streamContainer.remove();
-            
+            </div>
+        `).join('');
+
+        // 保持角色区显示
+        characterGrid.style.display = '';
+        streamContainer.remove();
+
+        // 新增：为每个角色生成立绘（只在AI生成角色后执行，动态更新图片）
+        for (const character of gameState.characters) {
+            await generateCharacterImage(character);
+            await new Promise(resolve => setTimeout(resolve, 1000)); // 间隔1秒
+        }
+
             // 将角色保存到当前存档
             if (archiveKey) {
                 try {
@@ -2185,7 +2222,7 @@ async function generateCharactersContent() {
         } else {
             console.error('生成角色失败:', error);
             streamContent.textContent = '生成失败，请重试';
-            
+
             // 3秒后恢复原始内容
             setTimeout(() => {
                 characterGrid.style.display = '';
@@ -2195,6 +2232,48 @@ async function generateCharactersContent() {
     }
 }
 
+async function generateCharacterImage(character) {
+    const imageElement = document.getElementById(`character-image-${character.name}`);
+    if (!imageElement) {
+        console.error(`未找到角色 ${character.name} 的图片元素`);
+        return;
+    }
+
+    try {
+        const response = await fetch('/api/generate-character-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: character.name,
+                description: character.description,
+                style: gameState.imageSettings.lastStyle || 'realistic',
+                colorTone: gameState.imageSettings.lastColorTone || 'warm'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`角色立绘生成失败，状态码: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.imageUrl) {
+            throw new Error('响应缺少 imageUrl');
+        }
+
+        console.log(`角色 ${character.name} 立绘生成成功: ${data.imageUrl}`);
+        imageElement.src = data.imageUrl;
+        imageElement.onload = () => console.log(`角色 ${character.name} 图片加载成功`);
+        imageElement.onerror = () => {
+            console.error(`角色 ${character.name} 图片加载失败: ${data.imageUrl}`);
+            imageElement.src = 'test.png';
+        };
+    } catch (error) {
+        console.error(`生成角色 ${character.name} 立绘失败:`, error);
+        imageElement.src = 'test.png';
+    }
+}
 
 // 从角色描述中提取特征标签
 function extractCharacterTraits(description) {
@@ -3891,36 +3970,74 @@ async function generateFirstChapter(gameData, outline) {
 
 // 生成场景图片
 async function generateSceneImage(sceneContent) {
-    // 提取场景描述关键词
-    const description = extractSceneDescription(sceneContent);
-    
-    // 请求图像生成
-    const response = await fetch('/api/generate-image', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            description: description,
+    const storyImage = document.getElementById('storyImage');
+    if (!storyImage) {
+        console.error('未找到 storyImage 元素');
+        return;
+    }
+
+    try {
+        // 提取场景描述
+        let description = extractSceneDescription(sceneContent);
+
+        // 拼接角色信息（只取主要角色，或全部角色）
+        const characterDescriptions = gameState.characters.map(char => {
+            // 可选：只取有立绘的角色
+            return `${char.name}（${char.description}）`;
+        }).join('；');
+
+        // 将角色信息加入场景描述
+        if (characterDescriptions) {
+            description += `，画面中出现人物：${characterDescriptions}`;
+        }
+
+        console.log('发送图像生成请求:', {
+            description,
             style: gameState.imageSettings.lastStyle || 'realistic',
             colorTone: gameState.imageSettings.lastColorTone || 'warm'
-        })
-    });
-    
-    if (!response.ok) {
-        throw new Error('图像生成失败');
+        });
+
+        const response = await fetch('/api/generate-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: description || '默认场景描述',
+                style: gameState.imageSettings.lastStyle || 'realistic',
+                colorTone: gameState.imageSettings.lastColorTone || 'warm'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`图像生成失败，状态码: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.imageUrl) {
+            throw new Error('响应缺少 imageUrl');
+        }
+
+        console.log('收到图像 URL:', data.imageUrl);
+        storyImage.src = data.imageUrl;
+
+        // 验证图片是否加载成功
+        storyImage.onload = () => console.log('图片加载成功:', data.imageUrl);
+        storyImage.onerror = () => {
+            console.error('图片加载失败:', data.imageUrl);
+            storyImage.src = 'test.png';
+        };
+    } catch (imageError) {
+        console.error('图像生成失败:', imageError);
+        storyImage.src = 'test.png';
     }
-    
-    const data = await response.json();
-    
-    // 更新图像显示
-    document.getElementById('storyImage').src = data.imageUrl;
 }
+
 
 // 从场景内容提取适合图像生成的描述
 function extractSceneDescription(sceneContent) {
     // 简单实现：取前100个字符作为描述
-    let description = sceneContent.substring(0, 100);
+    let description = sceneContent.substring(0, 200);
     
     // 尝试找到描述场景的句子
     const sceneSentencePatterns = [

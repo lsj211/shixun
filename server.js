@@ -766,6 +766,101 @@ app.post('/api/generate-next-scene', (req, res) => {
     });
 });
 
+
+
+// 新增图像生成API代理
+app.post('/api/generate-image', async (req, res) => {
+    try {
+        const { description, style, colorTone } = req.body;
+
+        // 验证必填字段
+        if (!description) {
+            return res.status(400).json({ error: '缺少场景描述字段' });
+        }
+
+        // 创建缓存键
+        const cacheKey = `image_${createHash('md5')
+            .update(description.substring(0, 50))
+            .digest('hex')}_${style || 'realistic'}_${colorTone || 'warm'}`;
+
+        // 检查缓存
+        const cachedImage = await getFromCache(cacheKey);
+        if (cachedImage) {
+            console.log('图像缓存命中，直接返回');
+            return res.json({ imageUrl: cachedImage });
+        }
+
+        try {
+            // 转发请求到Python后端
+            const pythonResponse = await axios.post(`${PYTHON_API_URL}/api/generate-image`, req.body);
+
+            // 验证响应格式
+            if (!pythonResponse.data || !pythonResponse.data.imageUrl) {
+                console.error('Python后端返回格式异常:', pythonResponse.data);
+                return res.status(500).json({ error: 'Python后端返回数据异常，缺少图像URL' });
+            }
+
+            // 缓存图像URL
+            await saveToCache(cacheKey, pythonResponse.data.imageUrl);
+
+            // 返回响应
+            return res.json({ imageUrl: pythonResponse.data.imageUrl });
+
+        } catch (apiError) {
+            console.error('Python后端图像生成请求失败:', apiError.message);
+            const statusCode = apiError.response?.status || 500;
+            const errorMessage = apiError.response?.data?.error || 'Python后端图像生成失败';
+            return res.status(statusCode).json({ error: errorMessage });
+        }
+
+    } catch (error) {
+        console.error('生成图像失败（Node层）:', error);
+        res.status(500).json({ error: error.message || '服务器内部错误' });
+    }
+});
+
+// 新增角色立绘生成代理
+app.post('/api/generate-character-image', async (req, res) => {
+    try {
+        const { name, description, style = 'realistic', colorTone = 'warm' } = req.body;
+        if (!name || !description) {
+            console.error('请求缺少 name 或 description 字段:', req.body);
+            return res.status(400).json({ error: '缺少角色名称或描述字段' });
+        }
+
+        const cacheKey = `character_image_${createHash('md5').update(name + description.substring(0, 50)).digest('hex')}_${style}_${colorTone}`;
+        const cachedImage = await getFromCache(cacheKey);
+        if (cachedImage) {
+            console.log('角色立绘缓存命中:', cacheKey);
+            return res.json({ imageUrl: cachedImage });
+        }
+
+        const pythonResponse = await axios.post(`${PYTHON_API_URL}/api/generate-character-image`, {
+            name,
+            description,
+            style,
+            colorTone
+        }, { timeout: 60000 });
+
+        if (!pythonResponse.data || !pythonResponse.data.imageUrl) {
+            console.error('Python后端返回格式异常:', pythonResponse.data);
+            return res.status(500).json({ error: 'Python后端返回数据异常，缺少图像URL' });
+        }
+
+        await saveToCache(cacheKey, pythonResponse.data.imageUrl);
+        console.log('角色立绘生成成功，缓存已保存:', cacheKey);
+        return res.json({ imageUrl: pythonResponse.data.imageUrl });
+    } catch (error) {
+        console.error('生成角色立绘失败（Node层）:', {
+            message: error.message,
+            stack: error.stack
+        });
+        res.status(500).json({ error: '服务器内部错误，请检查日志' });
+    }
+});
+
+
+
 // 首页
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public/index.html'));

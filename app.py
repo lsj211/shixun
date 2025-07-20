@@ -1,4 +1,36 @@
 import jieba
+import jieba
+import jieba.posseg as pseg
+from collections import Counter
+from typing import List, Dict, Optional, Union, AsyncGenerator, Any
+from datetime import datetime, timedelta
+from pathlib import Path
+import re
+import os
+import json
+import time
+import asyncio
+import hashlib
+from http import HTTPStatus  # 新增导入
+from urllib.parse import urlparse, unquote  # 新增导入
+from pathlib import PurePosixPath  # 新增导入
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    print("成功加载 .env 文件")
+except ImportError:
+    print("警告: python-dotenv 未安装，尝试直接使用环境变量")
+import nltk
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel, Field
+from langchain_community.chat_models.tongyi import ChatTongyi
+from langchain.prompts.chat import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
+from langchain_core.messages import HumanMessage, SystemMessage
+from dashscope import ImageSynthesis  # 新增导入
+
 import jieba.posseg as pseg
 from collections import Counter
 from typing import List
@@ -12,6 +44,8 @@ from typing import Dict, List, Optional, Union, AsyncGenerator, Any
 from datetime import datetime, timedelta
 from pathlib import Path
 import re
+
+import numpy as np
 # 导入 dotenv 用于加载环境变量
 try:
     from dotenv import load_dotenv
@@ -168,21 +202,201 @@ async def generate_content_stream(messages, cache_key=None):
     # 发送完成信号
     yield f"data: {json.dumps({'text': '', 'done': True})}\n\n"
 
+
+
+from fastapi import FastAPI
+from pydantic import BaseModel
+from fastapi.responses import StreamingResponse
+import faiss
+import json
+from langchain_community.embeddings.dashscope import DashScopeEmbeddings
+
+# # 初始化 SentenceTransformer 模型
+# model = DashScopeEmbeddings(model="text-embedding-v1")
+
+# # 假设你有分类的小说 JSON 文件路径
+# novel_data = {
+#     "玄幻": "H:\llm\model\data\玄幻.json",
+#     "爱情": "path_to_romance.json",
+#     "悬疑": "path_to_mystery.json",
+#     "末世": "path_to_apocalypse.json"
+# }
+
+# # 读取并加载小说数据
+# def load_novel_data(genre: str):
+#     with open(novel_data.get(genre, ""), "r", encoding="utf-8") as f:
+#         return json.load(f)
+
+# # 获取小说正文并进行嵌入
+# def embed_novels(genre: str):
+#     novels = load_novel_data(genre)["novels"]
+#     texts = [novel["content"] for novel in novels]
+    
+#     # 将文本转化为向量
+#     novel_embeddings = model.encode(texts)
+    
+#     # 使用 FAISS 创建索引
+#     index = faiss.IndexFlatL2(novel_embeddings.shape[1])
+#     index.add(novel_embeddings)
+    
+#     return index, texts
+
+# # 向量检索功能：基于查询进行检索
+# def retrieve_relevant_content(query: str, genre: str):
+#     # 获取向量检索索引
+#     index, texts = embed_novels(genre)
+    
+#     # 查询向量化
+#     query_embedding = model.encode([query])
+    
+#     # 使用 FAISS 检索最相关的文本
+#     D, I = index.search(query_embedding, 3)  # 获取前 3 个相关文本
+    
+#     return [texts[i] for i in I[0]]
+
+
+# Initialize DashScopeEmbeddings model
+embeddings = DashScopeEmbeddings(model="text-embedding-v1")
+
+# Dictionary of novel data file paths by genre
+novel_data = {
+    "玄幻": r"H:\llm\model\data\玄幻.json",
+    "科幻": "path_to_scifi.json",
+    "爱情": "path_to_romance.json",
+    "悬疑": "path_to_mystery.json",
+    "末世": "path_to_apocalypse.json"
+}
+
+# Load novel data from JSON file
+def load_novel_data(genre: str):
+    try:
+        file_path = novel_data.get(genre, "")
+        if not file_path:
+            raise ValueError(f"No file path defined for genre {genre}.")
+        with open(file_path, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"File for genre {genre} not found at {file_path}.")
+    except json.JSONDecodeError:
+        raise ValueError(f"Invalid JSON format in file for genre {genre}.")
+
+
+def split_text_by_paragraph(text: str, max_length: int = 2048):
+    """将长文本按换段符分割成多个不超过最大长度的片段"""
+    paragraphs = text.split('\n\n')
+    
+    split_texts = []
+    current_text = ""
+    
+    for paragraph in paragraphs:
+        # 判断当前文本和段落的长度是否超过最大长度
+        if len(current_text) + len(paragraph) + 2 <= max_length:  # +2 是为了加入换行符
+            if current_text:
+                current_text += '\n\n' + paragraph  # 加入换段符
+            else:
+                current_text = paragraph
+        else:
+            if current_text:
+                split_texts.append(current_text)  # 当前片段超长，保存并开始新的片段
+            current_text = paragraph  # 新的片段开始
+
+    if current_text:
+        split_texts.append(current_text)
+
+    return split_texts
+
+
+# Embed novels and create FAISS index
+def embed_novels(genre: str):
+    # Load novel data
+    data = load_novel_data(genre)
+    texts = []
+    metadata = []
+    
+    # Extract chapter content and metadata
+    for novel in data:
+        novel_name = novel.get("novel_name", "Unknown Novel")
+        for chapter in novel.get("chapters", []):
+            if "content" in chapter and "title" in chapter:
+                # 对每个章节的内容按段落进行分割
+                split_texts = split_text_by_paragraph(chapter["content"])
+                
+                for idx, text in enumerate(split_texts):
+                    # 添加每个分割后的文本及其元数据
+                    texts.append(text)
+                    metadata.append({
+                        "novel_name": novel_name,
+                        "chapter_title": chapter["title"],
+                        "chapter_id": chapter.get("chapter_id", "Unknown"),
+                        "part_index": idx  # 为每个片段添加索引
+                    })
+    
+    if not texts:
+        raise ValueError(f"No valid chapter content found for genre {genre}.")
+    
+    # Convert texts to embeddings
+    novel_embeddings = embeddings.embed_documents(texts)
+    
+    # Convert embeddings to numpy array for FAISS
+    embedding_array = np.array(novel_embeddings).astype('float32')
+    
+    # Create FAISS index
+    dimension = embedding_array.shape[1]
+    faiss_index = faiss.IndexFlatL2(dimension)
+    faiss_index.add(embedding_array)
+    
+    return faiss_index, texts, metadata
+
+
+
+# Retrieve relevant content based on query
+def retrieve_relevant_content(query: str, genre: str, k: int = 3):
+    # Get FAISS index, texts, and metadata
+    faiss_index, texts, metadata = embed_novels(genre)
+    # Convert query to embedding
+    query_embedding = embeddings.embed_query(query)
+    query_array = np.array([query_embedding]).astype('float32')
+    
+    # Perform similarity search
+    distances, indices = faiss_index.search(query_array, k)
+    # Return the top k relevant texts with metadata
+    results = []
+    for i in indices[0]:
+        if i < len(texts):
+            results.append({
+                "novel_name": metadata[i]["novel_name"],
+                "chapter_title": metadata[i]["chapter_title"],
+                "chapter_id": metadata[i]["chapter_id"],
+                "content": texts[i][:200] + "..." if len(texts[i]) > 200 else texts[i]
+            })
+    print(f"检索到 {len(results)} 条相关内容")
+    return results
+
+
 @app.post("/api/generate-background")
 async def generate_background(request: BackgroundGenerationRequest):
     """生成故事背景（流式输出）"""
     # 创建缓存键
     cache_key = f"background_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+
+    # 步骤 1: 根据背景推断小说类型（这里直接假设是科幻）
+    genre = "玄幻"  # 假设从分类模型中得到了该结果
     
-    # 构建提示模板，在系统提示中直接添加字数和格式限制
+    # 步骤 2: 基于小说类型检索相关内容
+    relevant_content = retrieve_relevant_content(request.background, genre)
+    
+    # 步骤 3: 将相关内容转换为字符串列表，并拼接成一个字符串
+    relevant_content_text = "\n\n".join([content["content"] for content in relevant_content])
+    # 步骤 3: 构建背景生成的系统模板，包含检索到的相关内容
     system_template = (
-        "作为一个专业的互动小说创作者，请基于以下简短描述，创建一个故事背景和世界观设定。\n\n"
+        f"作为一个专业的互动小说创作者，请基于以下简短描述，创建一个故事背景和世界观设定。\n\n"
+        f"相关背景内容: {relevant_content_text}\n\n"
         "请严格遵守以下要求：\n"
         "1. 仅提供世界观相关内容，不要包含任何故事情节或剧情内容\n"
         "2. 世界观设定：限制在200字以内，仅描述故事发生的背景环境、社会结构、规则系统等\n"
         "3. 前情提要：每个事件不超过100字，仅提供故事发生前的关键剧情事件\n"
         "4. 重要地点：每个地点格式为\"重要地点: 地点名称\" + \"描述: 地点描述\"，描述不超过200字\n\n"
-        
+
         "格式要求：\n"
         "1. 世界观：纯文本段落，不使用标题或编号\n"
         "2. 前情提要：每个事件格式为\"前情提要: 事件名称\" + \"描述: 事件描述\"\n"
@@ -203,10 +417,53 @@ async def generate_background(request: BackgroundGenerationRequest):
         HumanMessage(content=human_template)
     ]
     
+    # 生成内容并流式返回
     return StreamingResponse(
         generate_content_stream(messages, cache_key),
         media_type="text/event-stream"
     )
+
+
+
+# @app.post("/api/generate-background")
+# async def generate_background(request: BackgroundGenerationRequest):
+#     """生成故事背景（流式输出）"""
+#     # 创建缓存键
+#     cache_key = f"background_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+    
+#     # 构建提示模板，在系统提示中直接添加字数和格式限制
+#     system_template = (
+#         "作为一个专业的互动小说创作者，请基于以下简短描述，创建一个故事背景和世界观设定。\n\n"
+#         "请严格遵守以下要求：\n"
+#         "1. 仅提供世界观相关内容，不要包含任何故事情节或剧情内容\n"
+#         "2. 世界观设定：限制在200字以内，仅描述故事发生的背景环境、社会结构、规则系统等\n"
+#         "3. 前情提要：每个事件不超过100字，仅提供故事发生前的关键剧情事件\n"
+#         "4. 重要地点：每个地点格式为\"重要地点: 地点名称\" + \"描述: 地点描述\"，描述不超过200字\n\n"
+        
+#         "格式要求：\n"
+#         "1. 世界观：纯文本段落，不使用标题或编号\n"
+#         "2. 前情提要：每个事件格式为\"前情提要: 事件名称\" + \"描述: 事件描述\"\n"
+#         "3. 重要地点：每个地点格式为\"重要地点: 地点名称\" + \"描述: 地点描述\"\n\n"
+        
+#         "请严格遵循以上格式，前情提要一定要是前情提要：标题：内容：，重要地点一定要是重要地点：名称：描述：，不要添加其他内容或解释，确保内容简洁精炼。"
+#     )
+    
+#     human_template = (
+#         f"基础描述: {request.background}\n\n"
+#         f"故事复杂度: {request.complexity} (简单/中等/复杂)\n"
+#         f"计划章节数: {request.chapterCount}章\n\n"
+#         f"请先生成世界观设定(200字以内)，然后生成2-3个前情提要(每个100字以内)，最后生成2-3个重要地点(名称+描述格式，描述200字以内)"
+#     )
+    
+#     messages = [
+#         SystemMessage(content=system_template),
+#         HumanMessage(content=human_template)
+#     ]
+    
+#     return StreamingResponse(
+#         generate_content_stream(messages, cache_key),
+#         media_type="text/event-stream"
+#     )
 
 # 在请求模型定义部分添加
 class BackgroundEnhanceRequest(BaseModel):
@@ -428,18 +685,25 @@ async def generate_story_node(request: StoryNodeRequest):
 
 @app.get("/")
 async def root():
-    """API根路径，返回服务状态"""
     return {
         "status": "online",
         "service": "互动小说AI后端服务",
         "version": "1.0.0",
         "endpoints": [
             "/api/generate-background",
+            "/api/enhance-background",
             "/api/generate-characters",
             "/api/generate-story-node",
-            "/api/generate-story-title"
+            "/api/generate-story-outline",
+            "/api/generate-story-title",
+            "/api/generate-chapter",
+            "/api/generate-next-scene",
+            "/api/generate-story-ending",
+            "/api/generate-image",
+            "/api/generate-character-image"
         ]
     }
+
 
 # 添加新的请求模型
 class StoryOutlineRequest(BaseModel):
@@ -1130,6 +1394,96 @@ async def generate_story_ending(request: StoryEndingRequest):
             "Connection": "keep-alive"
         }
     )
+
+
+
+
+
+class ImageGenerationRequest(BaseModel):
+    description: str = Field(..., description="场景描述")
+    style: str = Field("realistic", description="图像风格")
+    colorTone: str = Field("warm", description="图像色调")
+
+# 修改后的图像生成端点
+@app.post("/api/generate-image")
+async def generate_image(request: ImageGenerationRequest):
+    """生成场景图像"""
+    cache_key = f"image_{hashlib.md5(request.description[:50].encode()).hexdigest()}_{request.style}_{request.colorTone}"
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        print(f"图像缓存命中: {cache_key}")
+        return {"imageUrl": cached_content}
+
+    try:
+        # 使用 DashScope ImageSynthesis.call 生成图像
+        response = ImageSynthesis.call(
+            api_key=DASHSCOPE_API_KEY,
+            model="wanx2.1-t2i-turbo",
+            prompt=f"{request.description}, style: {request.style}, tone: {request.colorTone}",
+            n=1,
+            size="1024*1024"
+        )
+
+        if response.status_code == HTTPStatus.OK:
+            # 获取图像 URL
+            image_url = response.output.results[0].url
+            print(f"图像生成成功: {image_url}")
+            save_to_cache(cache_key, image_url)
+            return {"imageUrl": image_url}
+        else:
+            print(f"图像生成失败, status_code: {response.status_code}, code: {response.code}, message: {response.message}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"图像生成失败: status_code={response.status_code}, message={response.message}"
+            )
+
+    except Exception as e:
+        print(f"图像生成过程失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"图像生成失败: {str(e)}")
+
+class CharacterImageGenerationRequest(BaseModel):
+    name: str = Field(..., description="角色名称")
+    description: str = Field(..., description="角色描述")
+    style: str = Field("realistic", description="立绘风格")
+    colorTone: str = Field("warm", description="立绘色调")
+    
+# 新增角色立绘生成端点
+@app.post("/api/generate-character-image")
+async def generate_character_image(request: CharacterImageGenerationRequest):
+    """生成角色立绘"""
+    cache_key = f"character_image_{hashlib.md5((request.name + request.description[:50]).encode()).hexdigest()}_{request.style}_{request.colorTone}"
+    cached_content = get_from_cache(cache_key)
+    if cached_content:
+        print(f"角色立绘缓存命中: {cache_key}")
+        return {"imageUrl": cached_content}
+
+    try:
+        # 优化提示词以生成角色立绘
+        prompt = f"角色: {request.name}, {request.description}, 高清角色立绘, 全身肖像, 详细服装和面部特征, 背景简洁, style: {request.style}, tone: {request.colorTone}"
+        response = ImageSynthesis.call(
+            api_key=DASHSCOPE_API_KEY,
+            model="wanx2.1-t2i-turbo",
+            prompt=prompt,
+            n=1,
+            size="1024*1024"
+        )
+
+        if response.status_code == HTTPStatus.OK:
+            image_url = response.output.results[0].url
+            print(f"角色立绘生成成功: {image_url}")
+            save_to_cache(cache_key, image_url)
+            return {"imageUrl": image_url}
+        else:
+            print(f"角色立绘生成失败, status_code: {response.status_code}, code: {response.code}, message: {response.message}")
+            raise HTTPException(
+                status_code=500,
+                detail=f"角色立绘生成失败: status_code={response.status_code}, message={response.message}"
+            )
+    except Exception as e:
+        print(f"角色立绘生成过程失败: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"角色立绘生成失败: {str(e)}")
+
+
 
 # 启动服务器（开发环境）
 if __name__ == "__main__":
