@@ -790,24 +790,25 @@ async function generateStoryEndingStreaming(currentChoice) {
 
 
 // 修改通过API生成下一段剧情内容的函数，支持实时流式更新
+// 修改通过API生成下一段剧情内容的函数，支持实时流式更新
 async function generateNextContentFromAPI(choice) {
     try {
         // 收集游戏数据
         const gameData = collectGameData();
-        
+
         // 获取当前复杂度和每章幕数
         const complexity = gameState.settings.complexity || 'medium';
         const scenesPerChapter = getSceneCountByComplexity(complexity);
         const chapterCount = gameState.settings.chapterCount || 5;
-        
+
         // 计算下一幕和下一章
         let nextChapter = calculateNextChapter(currentStoryNode);
         let nextScene = calculateNextScene(currentStoryNode);
         console.log(`当前章节: ${nextChapter}, 当前场景: ${nextScene}, 每章幕数: ${scenesPerChapter}`);
-        
-        if(nextChapter==chapterCount&&nextScene===scenesPerChapter){ 
+
+        if (nextChapter == chapterCount && nextScene === scenesPerChapter) { 
             // 如果已经是最后一章的最后一幕，直接返回结局
-            return generateStoryEndingStreaming(choice);
+            return generateStoryEnding(choice);
         }
 
         // 检查是否需要进入下一章
@@ -818,6 +819,7 @@ async function generateNextContentFromAPI(choice) {
         } else if (nextScene === scenesPerChapter) {
             isChapterFinale = true;
         }
+
         // 构建请求数据
         const requestData = {
             background: gameData.background || "",
@@ -838,7 +840,7 @@ async function generateNextContentFromAPI(choice) {
             },
             isChapterFinale: isChapterFinale
         };
-        
+
         console.log("发送到API的请求数据:", {
             complexity: requestData.complexity,
             chapterNumber: requestData.chapterNumber,
@@ -849,17 +851,31 @@ async function generateNextContentFromAPI(choice) {
 
         // 获取内容容器
         let contentContainer = document.getElementById('storyText');
+        let titleContainer = document.getElementById('storyTitle'); // 假设标题区域的ID
+        let choicesContainer = document.getElementById('choiceButtons'); // 假设选项区域的ID
         let streamingIndicator = null;
 
-        // 防御性检查：如果storyContent不存在，创建临时容器
+        // 防御性检查：如果相关元素不存在，创建临时容器
         if (!contentContainer) {
-            console.warn('未找到storyContent元素，创建临时容器');
+            console.warn('未找到storyText元素，创建临时容器');
             contentContainer = document.createElement('div');
-            contentContainer.id = 'storyContent';
+            contentContainer.id = 'storyText';
             contentContainer.style.minHeight = '100px';
             contentContainer.style.padding = '10px';
             contentContainer.style.overflowY = 'auto';
             document.body.appendChild(contentContainer);
+        }
+        if (!titleContainer) {
+            console.warn('未找到storyTitle元素，创建临时容器');
+            titleContainer = document.createElement('h2');
+            titleContainer.id = 'storyTitle';
+            document.body.appendChild(titleContainer);
+        }
+        if (!choicesContainer) {
+            console.warn('未找到choiceButtons元素，创建临时容器');
+            choicesContainer = document.createElement('div');
+            choicesContainer.id = 'choiceButtons';
+            document.body.appendChild(choicesContainer);
         }
 
         // 创建流式内容指示器
@@ -868,6 +884,10 @@ async function generateNextContentFromAPI(choice) {
         streamingIndicator.textContent = '正在生成剧情...';
         streamingIndicator.style.color = '#666';
         streamingIndicator.style.fontStyle = 'italic';
+        contentContainer.appendChild(streamingIndicator);
+
+        // 清空内容容器，仅保留流式指示器
+        contentContainer.innerHTML = '';
         contentContainer.appendChild(streamingIndicator);
 
         // 使用fetch处理SSE
@@ -886,6 +906,9 @@ async function generateNextContentFromAPI(choice) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = '';
+        let contentStart = false;
+        let contentText = '';
+        let choicesStart = false;
 
         return new Promise((resolve, reject) => {
             async function readStream() {
@@ -902,7 +925,6 @@ async function generateNextContentFromAPI(choice) {
                                 result = JSON.parse(fullResponse);
                             } catch (e) {
                                 console.warn('无法解析完整JSON:', e, 'fullResponse:', fullResponse);
-                                // 尝试提取JSON部分
                                 const jsonMatch = fullResponse.match(/(\{[\s\S]*?\})/);
                                 if (jsonMatch) {
                                     try {
@@ -911,7 +933,7 @@ async function generateNextContentFromAPI(choice) {
                                         console.warn('无法解析提取的JSON，构造默认结构:', e2);
                                         result = {
                                             title: `第${requestData.chapterNumber}章：新的发展`,
-                                            content: fullResponse,
+                                            content: contentText || fullResponse,
                                             choices: [
                                                 {
                                                     text: "继续探索",
@@ -930,7 +952,7 @@ async function generateNextContentFromAPI(choice) {
                                     console.warn('无法提取JSON，构造默认结构');
                                     result = {
                                         title: `第${requestData.chapterNumber}章：新的发展`,
-                                        content: fullResponse,
+                                        content: contentText || fullResponse,
                                         choices: [
                                             {
                                                 text: "继续探索",
@@ -951,12 +973,31 @@ async function generateNextContentFromAPI(choice) {
                             const nextStoryNode = {
                                 id: 'node-' + Date.now(),
                                 title: result.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
-                                content: result.content || fullResponse,
-                                choices: result.choices || generateSpecificChoices(result.content || fullResponse, extractKeywords(result.content || fullResponse)),
+                                content: result.content || contentText,
+                                choices: result.choices || generateSpecificChoices(result.content || contentText, extractKeywords(result.content || contentText)),
                                 parentId: currentStoryNode.id,
                                 chapter: nextChapter,
                                 scene: nextScene
                             };
+
+                            // 更新标题和选项区域
+                            requestAnimationFrame(() => {
+                                titleContainer.textContent = nextStoryNode.title;
+                                contentContainer.innerHTML = contentText.replace(/\\n\\n/g, '<br>'); // 转换为换行
+                                if (nextStoryNode.choices && nextStoryNode.choices.length > 0) {
+                                    choicesContainer.innerHTML = nextStoryNode.choices.map((choice, index) => `
+                                        <button class="choice-btn" data-choice-index="${index}">
+                                            <span class="choice-text">${choice.text}</span>
+                                            <span class="choice-effect">${choice.effect || '未知效果'}</span>
+                                        </button>
+                                    `).join('');
+                                    // 为新选项绑定事件
+                                    document.querySelectorAll('.choice-btn').forEach(btn => {
+                                        btn.addEventListener('click', handleChoiceClick);
+                                    });
+                                }
+                                contentContainer.scrollTop = contentContainer.scrollHeight;
+                            });
 
                             console.log("生成的下一段剧情:", nextStoryNode);
                             resolve(nextStoryNode);
@@ -977,21 +1018,28 @@ async function generateNextContentFromAPI(choice) {
                                         fullResponse = typeof data.text === 'string' ? data.text : JSON.stringify(data.text);
                                         continue;
                                     }
-                                    // 实时更新内容
                                     fullResponse += data.text;
-                                    // 强制触发DOM更新
-                                    requestAnimationFrame(() => {
-                                        contentContainer.innerHTML = `<p>${fullResponse}</p>`;
-                                        contentContainer.scrollTop = contentContainer.scrollHeight;
-                                    });
+                                    // 只在 "content": " 之后到 "choices" 之前显示流式内容
+                                    if (fullResponse.includes('"content": "') && !choicesStart) {
+                                        const contentStartIndex = fullResponse.indexOf('"content": "') + 11;
+                                        const contentEndIndex = fullResponse.indexOf('"choices"');
+                                        if (contentEndIndex === -1) {
+                                            contentText = fullResponse.substring(contentStartIndex).replace(/"/g, '');
+                                            contentStart = true;
+                                        } else {
+                                            contentText = fullResponse.substring(contentStartIndex, contentEndIndex).replace(/"/g, '');
+                                            choicesStart = true;
+                                        }
+                                        if (contentStart) {
+                                            requestAnimationFrame(() => {
+                                                contentContainer.innerHTML = contentText.replace(/\\n\\n/g, '<br>'); // 流式中转换
+                                                contentContainer.scrollTop = contentContainer.scrollHeight;
+                                            });
+                                        }
+                                    }
                                 } catch (e) {
                                     console.warn('无法解析SSE数据:', dataStr, e);
-                                    // 假设非JSON数据是文本内容，累积并显示
                                     fullResponse += dataStr;
-                                    requestAnimationFrame(() => {
-                                        contentContainer.innerHTML = `<p>${fullResponse}</p>`;
-                                        contentContainer.scrollTop = contentContainer.scrollHeight;
-                                    });
                                 }
                             }
                         }
@@ -1015,6 +1063,7 @@ async function generateNextContentFromAPI(choice) {
         throw error;
     }
 }
+
 
 // 修改计算下一场景的函数
 function calculateNextScene(currentNode) {

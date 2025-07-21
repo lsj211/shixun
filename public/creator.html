@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
+    
     <div class="game-container">
         <!-- 左侧剧情树面板 -->
         <aside class="story-tree-panel">
@@ -16,9 +17,9 @@
                 <!-- 剧情树节点将通过 JS 动态生成 -->
             </div>
             <div class="tree-controls">
-                <button class="tree-btn edit-btn" title="编辑标题"><i class="fas fa-edit"></i> 编辑标题</button>
-                <button class="tree-btn back-btn" title="回溯修改"><i class="fas fa-history"></i> 回溯修改</button>
-            </div>
+    <button class="tree-btn edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i> 编辑标题</button>
+    <button class="tree-btn back-btn" title="更新内容"><i class="fas fa-history"></i> 更新内容</button>
+</div>
         </aside>
 
         <!-- 主要内容区域 -->
@@ -33,17 +34,30 @@
             <!-- 故事内容区 -->
             <div class="story-content">
                 <div class="stage-title">
-                    <h2 id="currentStageTitle">第一章：序章</h2>
-                    <button class="edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i></button>
-                </div>
+    <h2 id="currentStageTitle">第一章：序章</h2>
+    <button class="edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i></button>
+</div>
+<div id="loadingOverlay" style="display: none;">
+    <div class="spinner"></div>
+    <div id="loadingMessage"></div>
+  </div>
                 <div class="story-image-container">
-                    <img id="storyImage" src="https://via.placeholder.com/800x400" alt="场景图片">
+                    <img id="storyImage" src="test.png" alt="场景图片">
                     <button class="regenerate-image-btn" title="重新生成插画"><i class="fas fa-sync-alt"></i></button>
                 </div>
                 <div class="story-text-container">
                     <p id="storyText" class="story-text"></p>
                     <button class="edit-story-btn" title="编辑剧情"><i class="fas fa-edit"></i></button>
                 </div>
+                <div class="story-input-container">
+    <input 
+        type="text" 
+        id="storyCustomInput" 
+        class="story-custom-input" 
+        placeholder="输入修改内容..."
+    >
+    <button class="apply-modification-btn" title="应用修改"><i class="fas fa-check"></i> 应用修改</button>
+</div>
             </div>
 
             <!-- 玩家选择区 - 隐藏选择按钮 -->
@@ -185,8 +199,5 @@
 
     <script src="js/creator.js"></script>
 </body>
-<<<<<<< HEAD
 </html>
-=======
-</html>
->>>>>>> ff7ea994e5d61c23cf46daae35f812667e97ac0f
+

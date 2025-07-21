@@ -4,3 +4,4 @@ content_cache.json
 model/
 1.txt
 my_model/
+__pycache__/

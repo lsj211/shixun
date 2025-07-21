@@ -20,6 +20,8 @@ try:
     print("成功加载 .env 文件")
 except ImportError:
     print("警告: python-dotenv 未安装，尝试直接使用环境变量")
+
+    
 import nltk
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -160,6 +162,8 @@ def get_from_cache(key: str) -> Optional[dict]:
         print(f"读取缓存失败: {e}")
         return None
 
+
+
 # 请求模型定义
 class BackgroundGenerationRequest(BaseModel):
     background: str
@@ -211,60 +215,15 @@ import faiss
 import json
 from langchain_community.embeddings.dashscope import DashScopeEmbeddings
 
-# # 初始化 SentenceTransformer 模型
-# model = DashScopeEmbeddings(model="text-embedding-v1")
-
-# # 假设你有分类的小说 JSON 文件路径
-# novel_data = {
-#     "玄幻": "H:\llm\model\data\玄幻.json",
-#     "爱情": "path_to_romance.json",
-#     "悬疑": "path_to_mystery.json",
-#     "末世": "path_to_apocalypse.json"
-# }
-
-# # 读取并加载小说数据
-# def load_novel_data(genre: str):
-#     with open(novel_data.get(genre, ""), "r", encoding="utf-8") as f:
-#         return json.load(f)
-
-# # 获取小说正文并进行嵌入
-# def embed_novels(genre: str):
-#     novels = load_novel_data(genre)["novels"]
-#     texts = [novel["content"] for novel in novels]
-    
-#     # 将文本转化为向量
-#     novel_embeddings = model.encode(texts)
-    
-#     # 使用 FAISS 创建索引
-#     index = faiss.IndexFlatL2(novel_embeddings.shape[1])
-#     index.add(novel_embeddings)
-    
-#     return index, texts
-
-# # 向量检索功能：基于查询进行检索
-# def retrieve_relevant_content(query: str, genre: str):
-#     # 获取向量检索索引
-#     index, texts = embed_novels(genre)
-    
-#     # 查询向量化
-#     query_embedding = model.encode([query])
-    
-#     # 使用 FAISS 检索最相关的文本
-#     D, I = index.search(query_embedding, 3)  # 获取前 3 个相关文本
-    
-#     return [texts[i] for i in I[0]]
-
-
 # Initialize DashScopeEmbeddings model
 embeddings = DashScopeEmbeddings(model="text-embedding-v1")
 
 # Dictionary of novel data file paths by genre
 novel_data = {
     "玄幻": r"H:\llm\model\data\玄幻.json",
-    "科幻": "path_to_scifi.json",
-    "爱情": "path_to_romance.json",
-    "悬疑": "path_to_mystery.json",
-    "末世": "path_to_apocalypse.json"
+    "科幻": r"H:\llm\model\data\科幻.json",
+    "都市": r"H:\llm\model\data\都市.json",
+    "历史": r"H:\llm\model\data\历史.json"
 }
 
 # Load novel data from JSON file
@@ -372,6 +331,9 @@ def retrieve_relevant_content(query: str, genre: str, k: int = 3):
     print(f"检索到 {len(results)} 条相关内容")
     return results
 
+stroytheme=None
+
+from classify import classifier  # 导入分类器
 
 @app.post("/api/generate-background")
 async def generate_background(request: BackgroundGenerationRequest):
@@ -379,9 +341,16 @@ async def generate_background(request: BackgroundGenerationRequest):
     # 创建缓存键
     cache_key = f"background_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
 
+    result=classifier(
+        request.background,
+        candidate_labels=["科幻", "玄幻", "历史", "都市"]
+    )
     # 步骤 1: 根据背景推断小说类型（这里直接假设是科幻）
-    genre = "玄幻"  # 假设从分类模型中得到了该结果
-    
+    # genre = "玄幻"  # 假设从分类模型中得到了该结果
+    genre = result["labels"][0]
+
+    stroytheme=genre
+
     # 步骤 2: 基于小说类型检索相关内容
     relevant_content = retrieve_relevant_content(request.background, genre)
     
@@ -820,6 +789,7 @@ async def generate_story_title(request: StoryTitleRequest):
         "2. 与故事的基调(如悬疑/奇幻/爱情)相匹配\n"
         "3. 具有一定的吸引力和独特性\n"
         "4. 长度适中(5-15个字为宜)\n\n"
+        f"6. 小说的主题为{stroytheme}\n\n"
         "返回格式：\n"
         "主标题 | 副标题(如果有)"
     )
@@ -897,6 +867,8 @@ async def generate_chapter(request: ChapterRequest):
     # 创建缓存键
     cache_key = f"chapter_{request.chapterNumber}_{request.sceneNumber}_{request.background[:30]}_{request.complexity}"
     
+
+
     # 检查缓存
     cached_content = get_from_cache(cache_key)
     if cached_content:
@@ -1064,7 +1036,10 @@ async def generate_next_scene(request: dict):  # 简化为dict以避免严格的
     scenes_per_chapter = request.get('scenesPerChapter', get_scenes_per_complexity(request.get('complexity', 'medium')))
     is_chapter_finale = request.get('isChapterFinale', request.get('sceneNumber', 1) >= scenes_per_chapter)
     chapter_count = request.get('chapterCount', 5)
-    
+
+
+    relevant_content=retrieve_relevant_content(request.get('selectedChoice', {}).get('nextContent', ''),stroytheme)
+
     # 构建提示模板，增加章节结构相关指导
     system_template = (
         "你是一位专业的交互式小说作家。请根据当前剧情内容和用户的选择，"
@@ -1072,6 +1047,7 @@ async def generate_next_scene(request: dict):  # 简化为dict以避免严格的
         f"基于{request.get('complexity')}复杂度，整个故事被划分为{chapter_count}章，"
         f"每章包含{scenes_per_chapter}个场景。"
         f"当前你正在创作第{request.get('chapterNumber')}章第{request.get('sceneNumber')}场景，"
+        f"相关内容: {relevant_content}\n\n"
         f"{'这是本章的最后一个场景，需要为下一章做铺垫' if is_chapter_finale else '这不是本章的最后一个场景，需保持剧情连贯性'}\n\n"
         "请遵循以下要求：\n"
         "1. 内容应与当前剧情和用户选择保持连贯性\n"
@@ -1482,6 +1458,437 @@ async def generate_character_image(request: CharacterImageGenerationRequest):
     except Exception as e:
         print(f"角色立绘生成过程失败: {str(e)}")
         raise HTTPException(status_code=500, detail=f"角色立绘生成失败: {str(e)}")
+
+
+
+
+
+
+# 新增：剧情树生成请求模型
+class StoryTreeRequest(BaseModel):
+    background: str
+    characters: List[Dict[str, str]]
+    chapterCount: int = 7
+    chapterLength: int = 1000
+    complexity: str = "medium"
+
+# 新增：剧情树生成接口
+@app.post("/api/generate-story-tree")
+async def generate_story_tree(request: StoryTreeRequest):
+    """生成完整剧情树（带异常处理）"""
+    print(f"收到剧情树生成请求，章节数: {request.chapterCount}")  # 确认收到章节数
+    try:
+        # 创建缓存键时包含chapterCount
+        cache_key = f"story_tree_{request.background[:50]}_{len(request.characters)}_{request.chapterCount}_{request.chapterLength}"
+        print(f"生成剧情树的缓存键: {cache_key}")  # 确认缓存键
+        # 检查缓存
+        cached_tree = get_from_cache(cache_key)
+        if cached_tree:
+            return {"tree": cached_tree}
+        
+        # 准备角色信息字符串
+        characters_info = "\n".join(
+            f"- {char.get('name', '未命名')}: {char.get('description', '无描述')[:100]}"
+            for char in request.characters
+        )
+        
+        # 构建提示模板（使用 request.chapterLength 控制每章长度）
+        system_template = (
+            "你是一位专业的小说作家，请根据提供的故事背景和角色信息，创作一个完整的多章节故事大纲。\n\n"
+            "请严格按照以下要求创作：\n"
+            f"1. 总共创作 {request.chapterCount} 个章节\n"
+            f"2. 每个章节的内容长度控制在 {request.chapterLength} 字左右\n"  # 此处使用传入的章节长度
+            "3. 为每个章节创建富有吸引力且与内容相关的标题\n"
+            "4. 内容需要连贯，形成一个完整的故事线\n"
+            "5. 确保所有主要角色都有适当的戏份\n"
+            "6. 故事发展要符合提供的背景设定\n"
+            "7. 章节之间要有逻辑衔接\n\n"
+            "请以JSON格式返回，格式如下：\n"
+            "{\n"
+            "  \"chapters\": [\n"
+            "    {\"title\": \"第一章的标题\", \"content\": \"第一章的具体内容...\"},\n"
+            "    {\"title\": \"第二章的标题\", \"content\": \"第二章的具体内容...\"},\n"
+            "    ...\n"
+            "  ]\n"
+            "}\n\n"
+            "确保输出是有效的JSON，不要包含任何额外的解释或说明文字。"
+        )
+        
+        human_template = (
+            f"故事背景: {request.background}\n\n"
+            f"角色信息:\n{characters_info}\n\n"
+            f"请创作一个包含 {request.chapterCount} 个章节的故事，每章约 {request.chapterLength} 字。"
+        )
+        
+        messages = [
+            SystemMessage(content=system_template),
+            HumanMessage(content=human_template)
+        ]
+        
+        # 调用模型（非流式）
+        try:
+            response = chat_model(messages)
+            content = response.content.strip()
+            print(f"模型返回原始内容: {content[:200]}...")
+            
+            # 解析JSON（修正版）
+            try:
+                import re
+                json_match = re.search(r'\{.*\}', content, re.DOTALL)
+                if not json_match:
+                    raise ValueError("未找到有效的JSON结构")
+                
+                json_str = json_match.group(0)
+                story_data = json.loads(json_str)
+                
+                # 验证基本结构
+                if not isinstance(story_data, dict) or "chapters" not in story_data:
+                    raise ValueError("JSON缺少chapters字段")
+                
+                if not isinstance(story_data["chapters"], list) or len(story_data["chapters"]) == 0:
+                    raise ValueError("chapters必须是包含至少一个元素的数组")
+                
+                valid_chapters = []
+                for i, chapter in enumerate(story_data["chapters"]):
+                    # 确保章节是字典类型
+                    if not isinstance(chapter, dict):
+                        chapter = {"content": str(chapter)}
+                    
+                    # 优先使用模型生成的title和content
+                    title = chapter.get("title", "").strip()
+                    content = chapter.get("content", "").strip()
+                    
+                    # 仅在title缺失时才尝试从content中提取
+                    if not title and content:
+                        # 尝试从content中提取标题（仅作为后备）
+                        title_pattern = r'^第\s*([一二三四五六七八九十1-90]+)\s*章\s*[:：]?\s*([^\n]*)'
+                        title_match = re.search(title_pattern, content)
+                        
+                        if title_match:
+                            chapter_number = title_match.group(1)
+                            title_text = title_match.group(2).strip()
+                            title = title_text if title_text else f"第{chapter_number}章"
+                            content = content.replace(title_match.group(0), '', 1).strip()
+                        else:
+                            # 未匹配到章节格式，使用默认标题
+                            title = f"第{i+1}章"
+                    
+                    # 如果仍然没有标题，使用默认值
+                    if not title:
+                        title = f"第{i+1}章"
+                    
+                    # 处理内容为空的情况
+                    if not content:
+                        content = f"{title}: 未生成有效内容"
+                    
+                    valid_chapters.append({
+                        "title": title,
+                        "content": content
+                    })
+                
+                # 确保章节数量匹配
+                if len(valid_chapters) < request.chapterCount:
+                    print(f"警告: 章节数量不足（预期{request.chapterCount}，实际{len(valid_chapters)}）")
+                    for i in range(len(valid_chapters), request.chapterCount):
+                        valid_chapters.append({
+                            "title": f"第{i+1}章",
+                            "content": f"第{i+1}章: 未生成有效内容"
+                        })
+                
+                story_data["chapters"] = valid_chapters
+                save_to_cache(cache_key, story_data)
+                return {"tree": story_data}
+                
+            except json.JSONDecodeError as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"解析剧情树JSON失败: {str(e)}"
+                )
+            except ValueError as e:
+                raise HTTPException(
+                    status_code=500,
+                    detail=f"剧情树数据结构错误: {str(e)}"
+                )
+        
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"调用模型失败: {str(e)}"
+            )
+    
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"剧情树生成接口未处理异常: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"剧情树生成失败: {str(e)}"
+        )
+
+
+
+
+@app.post("/api/generate-chapter-titles")
+async def generate_chapter_titles(request: StoryTreeRequest):
+    """生成章节标题列表"""
+    # 创建缓存键（包含复杂度和章节数）
+    cache_key = f"chapter_titles_{request.background[:50]}_{request.complexity}_{request.chapterCount}"
+    
+    # 检查缓存
+    cached_titles = get_from_cache(cache_key)
+    if cached_titles:
+        return {"titles": cached_titles}
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的小说作家，请根据提供的故事背景和角色信息，为一个多章节故事创作章节标题。\n\n"
+        "请严格按照以下要求创作：\n"
+        f"1. 总共创作 {request.chapterCount} 个章节标题\n"
+        "2. 每个标题应富有吸引力且与内容相关\n"
+        "3. 标题之间要有逻辑连贯性，体现故事发展脉络\n"
+        "4. 标题应简洁明了，长度适中\n\n"
+        "请以JSON格式返回，格式如下：\n"
+        "[\n"
+        "  \"第一章的标题\",\n"
+        "  \"第二章的标题\",\n"
+        "  ...\n"
+        "]\n\n"
+        "确保输出是有效的JSON数组，不要包含任何额外的解释或说明文字。"
+    )
+    
+    # 增加复杂度描述到提示中
+    complexity_description = {
+        "low": "简单的情节发展和基础的角色互动",
+        "medium": "中等复杂度的情节，包含一些转折和角色发展",
+        "high": "复杂的情节线、多重冲突和深入的角色心理描写"
+    }.get(request.complexity, "中等复杂度的情节")
+    
+    human_template = (
+        f"故事背景: {request.background}\n\n"
+        f"角色信息:\n{format_characters(request.characters)}\n\n"
+        f"故事复杂度: {complexity_description}\n\n"
+        f"请为这个故事创作 {request.chapterCount} 个章节的标题。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        content = response.content.strip()
+        
+        # 解析JSON
+        try:
+            titles = json.loads(content)
+            if not isinstance(titles, list) or len(titles) == 0:
+                raise ValueError("返回的不是有效的标题列表")
+            
+            # 确保标题数量正确
+            if len(titles) < request.chapterCount:
+                print(f"警告: 标题数量不足（预期{request.chapterCount}，实际{len(titles)}）")
+                for i in range(len(titles), request.chapterCount):
+                    titles.append(f"第{i+1}章")
+            
+            save_to_cache(cache_key, titles)
+            return {"titles": titles}
+            
+        except json.JSONDecodeError as e:
+            raise HTTPException(
+                status_code=500,
+                detail=f"解析章节标题JSON失败: {str(e)}"
+            )
+    
+    except Exception as e:
+        print(f"生成章节标题失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成章节标题失败: {str(e)}")
+
+# 定义前置章节的结构（包含id、title、content）
+class ChapterInfo(BaseModel):
+    id: int  # 明确允许id字段，类型为整数
+    title: str  # 章节标题
+    content: str  # 章节内容（允许空字符串）
+
+class SpecificChapterRequest(BaseModel):
+    background: str
+    characters: List[Dict[str, Any]]
+    complexity: str = "medium"
+    chapterNumber: int
+    chapterCount: int
+    currentChapterTitle: str
+    previousChapters: List[ChapterInfo] = []  
+
+@app.post("/api/generate-specific-chapter")
+async def generate_specific_chapter(request: SpecificChapterRequest):
+    """生成特定章节的内容"""
+    # 创建缓存键
+    # previous_chapters_key = "_".join([f"{ch['title'][:10]}" for ch in request.previousChapters])
+    # cache_key = f"specific_chapter_{request.chapterNumber}_{request.currentChapterTitle[:20]}_{previous_chapters_key}"
+    
+    # 检查缓存
+    # cached_content = get_from_cache(cache_key)
+    # if cached_content:
+    #     return {"content": cached_content}
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的小说作家，请根据提供的故事背景、角色信息和前面章节内容，"
+        f"创作第{request.chapterNumber}章的具体内容。\n\n"
+        f"整个故事共{request.chapterCount}章，当前是第{request.chapterNumber}章。\n\n"
+        "请遵循以下要求：\n"
+        "1. 内容应与前面章节保持连贯性\n"
+        "2. 章节内容应围绕当前章节标题展开\n"
+        "3. 根据章节在故事中的位置微调各章节的叙事节奏\n"
+        "4. 确保所有主要角色都有适当的戏份\n"
+        "5. 内容需要连贯，形成一个完整的故事线\n\n"
+        "请直接返回章节的详细内容文本，不要包含任何额外的解释或说明文字。"
+    )
+    
+    # 构建前面章节的摘要
+    previous_chapters_summary = ""
+    if request.previousChapters:
+        previous_chapters_summary = "前面章节全部内容：\n"
+        for i, chapter in enumerate(request.previousChapters):
+            # previous_chapters_summary += f"第{i+1}章《{chapter['title']}》：{chapter['content']}\n\n"
+            previous_chapters_summary += f"第{i+1}章《{chapter.title}》：{chapter.content}\n\n"
+
+    
+    human_template = (
+        f"故事背景: {request.background}\n\n"
+        f"角色信息:\n{format_characters(request.characters)}\n\n"
+        f"{previous_chapters_summary}"
+        f"当前章节: 第{request.chapterNumber}章《{request.currentChapterTitle}》\n\n"
+        f"请创作第{request.chapterNumber}章的详细内容。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        content = response.content.strip()
+        
+        # 保存到缓存
+        # save_to_cache(cache_key, content)
+        
+        return {"content": content}
+    
+    except Exception as e:
+        print(f"生成特定章节内容失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成特定章节内容失败: {str(e)}")
+
+
+
+
+class laterChapterRequest(BaseModel):
+    background: str
+    characters: List[Dict[str, Any]]
+    complexity: str = "medium"
+    chapterNumber: int
+    chapterCount: int
+    # 使用子模型指定previousChapters的结构，允许包含id
+    previousChapters: List[ChapterInfo] = []  # 替换原有的List[Dict[str, str]]
+
+@app.post("/api/generate-later-chapters")
+async def generate_later_chapters(request: laterChapterRequest):
+    """生成特定章节的内容"""
+    # 创建缓存键
+    # previous_chapters_key = "_".join([f"{ch['title'][:10]}" for ch in request.previousChapters])
+    # cache_key = f"later_chapter_{request.chapterNumber}_{request.currentChapterTitle[:20]}_{previous_chapters_key}"
+
+    # # 检查缓存
+    # cached_content = get_from_cache(cache_key)
+    # if cached_content:
+    #     return {"content": cached_content}
+    
+    # 构建提示模板
+    system_template = (
+        "你是一位专业的小说作家，请根据提供的故事背景、角色信息和前面章节内容，"
+        f"创作第{request.chapterNumber}章以及后续章节的章节标题和具体内容。\n\n"
+        f"整个故事共{request.chapterCount}章，当前已创作完成了第{request.chapterNumber - 1}章。\n\n"
+        "请遵循以下要求：\n"
+        "1. 各章节标题和内容应与前面章节保持连贯性\n"
+        "2. 各章节内容应围绕对应章节标题展开\n"
+        "3. 根据章节在故事中的位置微调各章节的叙事节奏\n"
+        "4. 确保所有主要角色都有适当的戏份\n"
+        "5. 内容需要连贯，形成一个完整的故事线\n\n"
+        "请按照以下JSON格式返回：\n"
+        "{\n"
+        "  \"chapters\": [\n"
+        "    {\n"
+        "      \"chapterNumber\": X,\n"
+        "      \"title\": \"标题内容\",\n"
+        "      \"content\": \"章节完整内容文本\"\n"
+        "    },\n"
+        "    ...\n"
+        "  ]\n"
+        "}"
+        "确保输出是有效的JSON数组，不要包含任何额外的解释或说明文字。"
+    )
+    
+    # 构建前面章节的摘要
+    previous_chapters_summary = ""
+    if request.previousChapters:
+        previous_chapters_summary = "前面章节全部内容：\n"
+        for i, chapter in enumerate(request.previousChapters):
+            # 修正后代码
+            previous_chapters_summary += f"第{i+1}章《{chapter.title}》：{chapter.content}\n\n"
+    
+    human_template = (
+        f"故事背景: {request.background}\n\n"
+        f"角色信息:\n{format_characters(request.characters)}\n\n"
+        f"{previous_chapters_summary}"
+        # f"当前章节: 第{request.chapterNumber}章《{request.currentChapterTitle}》\n\n"
+        f"请根据要求创作。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    try:
+        response = await chat_model.ainvoke(messages)
+        print(f"AI返回内容: {response.content[:200]}...")  # 打印前200个字符以便调试
+        content = response.content.strip()
+        
+        # 保存到缓存
+        # save_to_cache(cache_key, content)
+        
+        # return {"content": content}
+    
+
+        cleaned_content = re.sub(r'[\x00-\x1F\x7F]', '', content)
+
+        try:
+            # 解析清洗后的JSON
+            ai_result = json.loads(cleaned_content)
+            chapters_from_ai = ai_result.get("chapters", [])
+
+            # （后续格式转换逻辑不变）
+            formatted_chapters = []
+            for chapter in chapters_from_ai:
+                formatted_chapters.append({
+                    "id": chapter.get("chapterNumber"),
+                    "title": chapter.get("title"),
+                    "content": chapter.get("content"),
+                    "generated": True
+                })
+
+            return {"chapters": formatted_chapters}
+
+        except json.JSONDecodeError as e:
+            print(f"清洗后仍无法解析JSON: {e}，原始内容: {cleaned_content}")
+            raise HTTPException(status_code=500, detail=f"生成内容解析失败: {str(e)}")
+
+    except Exception as e:
+        print(f"生成失败: {e}")
+        raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+
 
 
 

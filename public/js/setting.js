@@ -253,6 +253,170 @@ document.addEventListener('DOMContentLoaded', () => {
     
 
 
+const createSteps = [
+        document.getElementById('create-text-step-1'),
+        document.getElementById('create-text-step-2'),
+        document.getElementById('create-text-step-3'),
+        document.getElementById('create-text-step-4')
+    ];
+
+    // 下一步按钮逻辑
+    createSteps.forEach((step, index) => {
+        if (index < createSteps.length - 1) {
+            const nextBtn = step.querySelector('.next-btn');
+            if (!nextBtn) return;
+            nextBtn.addEventListener('click', async () => {
+                // 步骤1校验
+                if (index === 0) {
+                    const backgroundText = document.getElementById('create-story-background').value.trim();
+                    if (!backgroundText) {
+                        alert('请输入故事背景');
+                        return;
+                    }
+                    
+                    // 在创作模式的步骤1进入步骤2时，生成角色
+                    if (index === 0) {
+                        try {
+                            await generateCharactersForCreation(backgroundText);
+                        } catch (error) {
+                            console.error('创作模式角色生成失败:', error);
+                        }
+                    }
+                }
+                step.classList.add('hidden');
+                createSteps[index + 1].classList.remove('hidden');
+            });
+        }
+    });
+
+    // 上一步按钮逻辑
+    createSteps.forEach((step, index) => {
+        if (index > 0) {
+            const prevBtn = step.querySelector('.prev-btn');
+            if (!prevBtn) return;
+            prevBtn.addEventListener('click', () => {
+                step.classList.add('hidden');
+                createSteps[index - 1].classList.remove('hidden');
+            });
+        }
+    });
+
+    // 章节数滑块逻辑
+    const createChapterCount = document.getElementById('create-chapter-count');
+    const createChapterDisplay = document.getElementById('create-chapter-display');
+    if (createChapterCount && createChapterDisplay) {
+        createChapterCount.addEventListener('input', () => {
+            createChapterDisplay.textContent = `${createChapterCount.value} 章`;
+            console.log(`章节数设置为: ${createChapterCount.value}`);
+        });
+    }
+
+    // 复杂度选择逻辑
+    const createComplexityOptions = document.getElementsByName('create-complexity');
+    createComplexityOptions.forEach(option => {
+        option.addEventListener('change', () => {
+            if (option.checked) {
+                // 可存储到全局设置
+            }
+        });
+    });
+
+    // 添加角色按钮
+    const addCharacterBtn = document.querySelector('#create-text-step-2 .add-character-btn');
+    const createCharactersContainer = document.getElementById('create-characters-container');
+    if (addCharacterBtn && createCharactersContainer) {
+        addCharacterBtn.addEventListener('click', () => {
+            addCharacterInput(createCharactersContainer);
+        });
+    }
+
+    // 生成角色按钮（新增）
+    const generateCharactersBtn = document.querySelector('#create-text-step-1 .generate-characters-btn');
+    if (generateCharactersBtn && createCharactersContainer) {
+        generateCharactersBtn.addEventListener('click', async () => {
+            const backgroundText = document.getElementById('create-story-background').value.trim();
+            if (!backgroundText) {
+                alert('请先输入故事背景');
+                return;
+            }
+            
+            try {
+                await generateCharactersForCreation(backgroundText);
+            } catch (error) {
+                console.error('创作模式角色生成失败:', error);
+                alert('角色生成失败，请重试');
+            }
+        });
+    }
+
+    
+   // 开始创作按钮
+// const startBtn = document.querySelector('#create-text-step-4 .start-creation-btn');
+// if (startBtn) {
+//     startBtn.addEventListener('click', async () => {
+//         console.log('开始创作按钮被点击');
+//         // 收集所有设置
+//         const settings = {
+//             mode: 'creative',
+//             type: 'text',
+//             background: document.getElementById('create-story-background').value,
+//             complexity: document.querySelector('input[name="create-complexity"]:checked').value,
+//             chapterCount: document.getElementById('create-chapter-count').value, // 获取章节数
+//             characters: []
+//         };
+//         document.querySelectorAll('#create-characters-container .character-input').forEach(input => {
+//             const name = input.querySelector('.character-name').value.trim();
+//             const desc = input.querySelector('.character-desc').value.trim();
+//             if (name || desc) {
+//                 settings.characters.push({ name: name || '未命名角色', description: desc });
+//             }
+//         });
+
+        
+//     });
+// }
+ const startBtn = document.querySelector('#create-text-step-4 .start-creation-btn');
+    if (startBtn) {
+        startBtn.addEventListener('click', () => {
+            // 收集所有设置
+            const settings = {
+                mode: 'creative',
+                type: 'text',
+                background: document.getElementById('create-story-background').value,
+                complexity: document.querySelector('input[name="create-complexity"]:checked').value,
+                chapterCount: document.getElementById('create-chapter-count').value,
+                characters: []
+            };
+            document.querySelectorAll('#create-characters-container .character-input').forEach(input => {
+                const name = input.querySelector('.character-name').value.trim();
+                const desc = input.querySelector('.character-desc').value.trim();
+                if (name || desc) {
+                    settings.characters.push({ name: name || '未命名角色', description: desc });
+                }
+            });
+            // 存储设置
+            localStorage.setItem('gameSettings', JSON.stringify(settings));
+            // 跳转
+            window.location.href = 'creator.html';
+        });
+        
+    }
+
+    // 进入创作模式时显示第1步
+    if (createModeBtn) {
+        createModeBtn.addEventListener('click', () => {
+            document.getElementById('mode-selection').classList.add('hidden');
+            document.getElementById('create-mode-settings').classList.remove('hidden');
+            // 显示第1步，隐藏其他
+            createSteps.forEach((step, idx) => {
+                if (idx === 0) step.classList.remove('hidden');
+                else step.classList.add('hidden');
+            });
+            // 初始化角色区
+            if (createCharactersContainer) createCharactersContainer.innerHTML = '';
+        });
+    }
+
 
 
     // =================== 辅助函数 ===================
@@ -605,6 +769,282 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('image-characters').value = '根据上传的图片生成的角色设定...';
     }
 
+
+
+
+
+    async function generateCharactersForCreation(background) {
+        // 防止重复生成
+        if (isGeneratingCharacters) return;
+        
+        try {
+            isGeneratingCharacters = true;
+            console.log("创作模式开始生成角色，背景:", background);
+            
+            // 清空现有角色输入框，添加一个"正在生成"的提示
+            const charactersContainer = document.getElementById('create-characters-container');
+            charactersContainer.innerHTML = `
+                <div class="generating-message">
+                    <i class="fas fa-spinner fa-spin"></i> 正在根据故事背景生成角色...
+                </div>
+            `;
+            
+            // 基本错误检查
+            if (!background || background.trim().length < 5) {
+                throw new Error('故事背景太短，无法生成有意义的角色');
+            }
+            
+            // 添加默认角色作为备用
+            const timeoutId = setTimeout(() => {
+                // 先检查是否已经完成生成
+                if (!isGeneratingCharacters) return;
+                
+                console.log("创作模式生成超时，创建默认角色...");
+                
+                // 如果30秒后还在生成中，则使用默认角色
+                charactersContainer.innerHTML = '';
+                addCharacterInput(charactersContainer, "主角", "这是故事的主角，你可以编辑名称和描述。");
+                addCharacterInput(charactersContainer, "配角", "这是故事的配角，你可以编辑名称和描述。");
+                
+                // 标记为已完成，避免重复处理
+                isGeneratingCharacters = false;
+            }, 30000); // 30秒超时
+            
+            try {
+                // 调用API获取角色 - 与游玩模式相同的API
+                const response = await fetch('/api/generate-characters', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        background: background,
+                        complexity: document.querySelector('input[name="create-complexity"]:checked')?.value || 'medium',
+                        characterCount: 3 // 默认生成3个角色
+                    })
+                });
+                
+                // 检查响应状态
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error(`创作模式API请求失败，状态码: ${response.status}，错误: ${errorText}`);
+                    throw new Error(`API请求失败，状态码: ${response.status}`);
+                }
+                
+                // 检查响应类型，是否为SSE
+                const contentType = response.headers.get('Content-Type');
+                
+                if (contentType && contentType.includes('text/event-stream')) {
+                    // 是SSE流，需要逐行处理
+                    console.log("创作模式收到SSE流响应，开始处理...");
+                    
+                    // 清除超时计时器
+                    clearTimeout(timeoutId);
+                    
+                    // 创建临时容器来显示生成过程
+                    const tempContainer = document.createElement('div');
+                    tempContainer.className = 'character-stream-container';
+                    tempContainer.style.backgroundColor = '#f9f9f9';
+                    tempContainer.style.border = '1px solid #ddd';
+                    tempContainer.style.borderRadius = '5px';
+                    tempContainer.style.padding = '10px';
+                    tempContainer.style.margin = '10px 0';
+                    tempContainer.style.maxHeight = '300px';
+                    tempContainer.style.overflowY = 'auto';
+                    tempContainer.innerHTML = '<div class="stream-title">正在生成角色：</div><div class="stream-content"></div>';
+                    
+                    // 替换原有的生成消息
+                    charactersContainer.innerHTML = '';
+                    charactersContainer.appendChild(tempContainer);
+                    
+                    const streamContent = tempContainer.querySelector('.stream-content');
+                    
+                    // 处理流数据
+                    const reader = response.body.getReader();
+                    const decoder = new TextDecoder('utf-8');
+                    let completeText = '';
+                    let buffer = '';
+                    
+                    while (true) {
+                        const { done, value } = await reader.read();
+                        
+                        if (done) {
+                            console.log("创作模式SSE流读取完成");
+                            break;
+                        }
+                        
+                        // 解码收到的数据
+                        const chunk = decoder.decode(value, { stream: true });
+                        buffer += chunk;
+                        
+                        // 处理缓冲区中的完整行
+                        const lines = buffer.split('\n');
+                        // 保留最后一个可能不完整的行
+                        buffer = lines.pop() || '';
+                        
+                        for (const line of lines) {
+                            if (line.trim() === '') continue; // 忽略空行
+                            
+                            if (line.startsWith('data: ')) {
+                                try {
+                                    // 解析事件数据
+                                    const eventData = JSON.parse(line.substring(6));
+                                    
+                                    if (eventData.text) {
+                                        completeText += eventData.text;
+                                        streamContent.textContent = completeText;
+                                        // 自动滚动到底部
+                                        tempContainer.scrollTop = tempContainer.scrollHeight;
+                                    }
+                                    
+                                    if (eventData.done) {
+                                        console.log("收到流结束标记");
+                                    }
+                                } catch (parseError) {
+                                    console.error("创作模式解析事件数据失败:", parseError, line);
+                                }
+                            }
+                        }
+                    }
+                    
+                    // 流处理完成，移除临时容器
+                    tempContainer.remove();
+                    
+                    // 解析生成的文本，提取角色
+                    console.log("创作模式开始从文本中解析角色:", completeText);
+                    let characters;
+                    
+                    try {
+                        characters = extractCharactersFromText(completeText);
+                        
+                        // 验证提取的角色
+                        if (characters && Array.isArray(characters) && characters.length > 0) {
+                            console.log("创作模式成功提取角色:", characters);
+                            
+                            // 验证角色数据的有效性
+                            characters = characters.filter(char => {
+                                const hasName = char && char.name && typeof char.name === 'string' && char.name.length > 0;
+                                const hasDesc = char && char.description && typeof char.description === 'string';
+                                return hasName || hasDesc; // 至少有名字或描述
+                            });
+                        }
+                        
+                        // 确保至少有一个角色
+                        if (!characters || !Array.isArray(characters) || characters.length === 0) {
+                            console.warn("创作模式无有效角色数据，使用默认角色");
+                            characters = [
+                                { name: "主角", description: "这是故事的主角，请编辑描述。" },
+                                { name: "配角", description: "这是故事的配角，请编辑描述。" }
+                            ];
+                        }
+                    } catch (parseError) {
+                        console.error("创作模式解析角色数据失败:", parseError);
+                        characters = [
+                            { name: "主角", description: "这是故事的主角，请编辑描述。" },
+                            { name: "配角", description: "这是故事的配角，请编辑描述。" }
+                        ];
+                    }
+                    
+                    // 为每个角色添加输入框
+                    characters.forEach(char => {
+                        addCharacterInput(charactersContainer, char.name, char.description);
+                    });
+                } else {
+                    // 尝试作为JSON解析
+                    try {
+                        console.log("创作模式尝试作为JSON解析响应");
+                        const data = await response.json();
+                        console.log("创作模式API响应成功:", data);
+                        
+                        // 清除超时计时器
+                        clearTimeout(timeoutId);
+                        
+                        // 清除生成中消息
+                        charactersContainer.innerHTML = '';
+                        
+                        // 处理返回的角色
+                        if (data && data.characters && Array.isArray(data.characters)) {
+                            // 有效的角色数据
+                            data.characters.forEach(char => {
+                                addCharacterInput(
+                                    charactersContainer, 
+                                    char.name || '未命名角色', 
+                                    char.description || '请描述这个角色...'
+                                );
+                            });
+                        } else {
+                            // 无有效数据，创建默认角色
+                            addCharacterInput(charactersContainer, "主角", "请描述主角...");
+                            addCharacterInput(charactersContainer, "配角", "请描述配角...");
+                        }
+                    } catch (jsonError) {
+                        console.error("创作模式JSON解析失败，尝试作为文本处理:", jsonError);
+                        
+                        // 清除超时计时器
+                        clearTimeout(timeoutId);
+                        
+                        // 尝试作为纯文本处理
+                        const text = await response.text();
+                        console.log("创作模式收到的原始响应:", text);
+                        
+                        // 尝试提取文本中的角色
+                        const characters = extractCharactersFromText(text);
+                        
+                        // 清除生成中消息
+                        charactersContainer.innerHTML = '';
+                        
+                        if (characters && characters.length > 0) {
+                            // 添加提取到的角色
+                            characters.forEach(char => {
+                                addCharacterInput(charactersContainer, char.name, char.description);
+                            });
+                        } else {
+                            // 无法提取，使用默认角色
+                            addCharacterInput(charactersContainer, "主角", "请描述主角...");
+                            addCharacterInput(charactersContainer, "配角", "请描述配角...");
+                        }
+                    }
+                }
+            } catch (apiError) {
+                console.error("创作模式API调用失败:", apiError);
+                
+                // 清除超时计时器
+                clearTimeout(timeoutId);
+                
+                // API调用失败，添加默认角色
+                charactersContainer.innerHTML = '';
+                addCharacterInput(charactersContainer, "主角", "这是故事的主角，你可以编辑名称和描述。");
+                addCharacterInput(charactersContainer, "配角", "这是故事的配角，你可以编辑名称和描述。");
+                
+                // 显示友好的错误信息
+                const errorMsg = document.createElement('div');
+                errorMsg.className = 'error-message';
+                errorMsg.style.color = 'red';
+                errorMsg.style.marginBottom = '10px';
+                errorMsg.textContent = '自动生成角色失败，已添加默认角色，您可以手动编辑。';
+                charactersContainer.insertBefore(errorMsg, charactersContainer.firstChild);
+            }
+        } catch (error) {
+            console.error('创作模式生成角色失败:', error);
+            
+            // 移除生成消息，添加默认角色
+            const charactersContainer = document.getElementById('create-characters-container');
+            charactersContainer.innerHTML = '';
+            addCharacterInput(charactersContainer, "主角", "这是故事的主角，你可以编辑名称和描述。");
+            addCharacterInput(charactersContainer, "配角", "这是故事的配角，你可以编辑名称和描述。");
+            
+            // 显示错误信息
+            alert('自动生成角色失败，已添加默认角色，您可以手动编辑。');
+        } finally {
+            isGeneratingCharacters = false;
+        }
+    }
+
+
+
+
+
+
     // =================== 图片上传逻辑 ===================
     const imageUpload = document.getElementById('image-upload');
     const imagePreviewContainer = document.getElementById('image-preview-container');
@@ -637,6 +1077,15 @@ document.addEventListener('DOMContentLoaded', () => {
     textBasedBtn.addEventListener('click', () => {
         textBasedSettings.classList.remove('hidden');
         imageBasedSettings.classList.add('hidden');
+        
+        // 显示第一步
+        document.getElementById('create-text-step-1').classList.remove('hidden');
+        
+        // 移除可能存在的重复结构，避免冲突
+        const oldModeSettings = document.getElementById('createModeSettings');
+        if (oldModeSettings) {
+            oldModeSettings.classList.add('hidden');
+        }
     });
     
     imageBasedBtn.addEventListener('click', () => {

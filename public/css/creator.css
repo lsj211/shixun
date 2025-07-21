@@ -13,10 +13,10 @@ body {
     overflow: hidden;
 }
 
-/* 游戏容器 */
+/* 游戏容器 - 1/4 + 1/2 + 1/4 宽度分配 */
 .game-container {
     display: grid;
-    grid-template-columns: 300px 1fr 300px;
+    grid-template-columns: 1fr 2fr 1fr; /* 剧情树面板占1/4，故事内容占1/2，系统面板占1/4 */
     gap: 20px;
     height: 100vh;
     padding: 20px;
@@ -267,6 +267,7 @@ body {
 
 /* 剧情树面板 */
 .story-tree-panel {
+    width: 100%; /* 由网格布局自动分配1/4宽度 */
     background: white;
     border-radius: 15px;
     padding: 20px;
@@ -277,15 +278,17 @@ body {
     overflow: hidden;
 }
 
-.story-tree {
+/* 剧情树节点布局 */
+#storyTree {
     display: flex;
-    flex-wrap: wrap;
-    gap: 20px;
-    padding: 20px;
+    flex-direction: column; /* 竖直排列更适合1/4宽度 */
+    gap: 0.8rem;
+    margin-top: 1rem;
+    padding-bottom: 1rem;
+    overflow-y: auto; /* 内容过多时允许滚动 */
 }
 
 .tree-node {
-    flex: 0 1 calc(100% - 20px);
     background: white;
     border-radius: 8px;
     padding: 15px;
@@ -296,6 +299,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    width: 100%; /* 占满1/4宽度 */
 }
 
 .tree-node:hover {
@@ -313,6 +317,10 @@ body {
     font-weight: 500;
     color: #333;
     flex: 1;
+    white-space: normal; /* 允许标题文本换行 */
+    overflow: visible; /* 不截断内容 */
+    text-overflow: clip; /* 不显示省略号 */
+    max-height: none; /* 取消最大高度限制 */
 }
 
 .tree-node-generate {
@@ -762,24 +770,43 @@ body {
 
 /* 图片加载状态样式 */
 #storyImage {
-    transition: opacity 0.3s ease;
+    transition: opacity 0.1s ease;
+     width: 400px;
+    height: 300px;
 }
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
     .game-container {
-        grid-template-columns: 250px 1fr 250px;
+        grid-template-columns: 1fr 2fr 1fr; /* 保持1/4-1/2-1/4比例 */
+        gap: 15px;
+        padding: 15px;
+    }
+    
+    .story-tree-panel,
+    .story-area,
+    .system-panel {
+        padding: 15px;
     }
 }
 
 @media (max-width: 992px) {
     .game-container {
-        grid-template-columns: 1fr;
+        grid-template-columns: 1fr; /* 小屏幕下堆叠布局 */
         grid-template-rows: auto 1fr auto;
     }
     
     .story-tree-panel, .control-panel {
         height: 300px;
+    }
+    
+    #storyTree {
+        flex-direction: row; /* 小屏幕下恢复水平排列 */
+        flex-wrap: wrap;
+    }
+    
+    .tree-node {
+        min-width: calc(50% - 0.4rem); /* 每行显示2个节点 */
     }
 }
 
@@ -835,4 +862,143 @@ body {
 
 .history-content::-webkit-scrollbar-thumb:hover {
     background: #555;
+}
+/* 编辑按钮样式增强 */
+.edit-title-btn, .edit-story-btn {
+    transition: all 0.2s ease;
+}
+
+.edit-title-btn:hover, .edit-story-btn:hover {
+    background-color: #4a90e2;
+    transform: translateY(-2px);
+}
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+/* 历史记录样式 */
+.history-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    margin-bottom: 8px;
+    font-size: 0.9em;
+}
+
+.history-item strong {
+    color: #333;
+}
+
+.history-preview {
+    color: #666;
+    margin-top: 4px;
+    padding-left: 4px;
+    border-left: 2px solid #ddd;
+}
+
+/* 模态框输入区域样式优化 */
+#modalInput {
+    width: 100%;
+    min-height: 150px;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1em;
+    resize: vertical;
+    margin: 15px 0;
+}
+
+#modalInput:focus {
+    outline: none;
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+}
+
+/* 编辑状态提示 */
+.editable:hover {
+    background-color: rgba(74, 144, 226, 0.05);
+}
+
+/* 确保模态框正确显示 */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 20px;
+    border: 1px solid #888;
+    width: 60%;
+    max-width: 600px;
+    border-radius: 8px;
+    position: relative;
+}
+
+.wide-modal {
+    width: 80%;
+    max-width: 1000px;
+}
+/* 输入框容器样式（保持布局一致性） */
+.story-input-container {
+    margin: 15px 0;
+    display: flex;
+    gap: 10px; /* 输入框与按钮间距 */
+    align-items: center;
+    width: 100%; /* 适应父容器宽度 */
+}
+
+/* 输入框大小控制 */
+.story-custom-input {
+    /* 基础尺寸设置 */
+    height: 40px; /* 输入框高度 */
+    padding: 0 12px; /* 内边距（影响可视大小） */
+    font-size: 16px; /* 文字大小 */
+    
+    /* 扩展尺寸控制（可按需调整） */
+    flex: 1; /* 占满剩余宽度 */
+    min-width: 200px; /* 最小宽度，防止过窄 */
+    max-width: 600px; /* 最大宽度，防止过宽 */
+    
+    /* 其他样式（保持美观） */
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    box-sizing: border-box; /* 确保padding不影响整体宽度 */
+}
+
+/* 提交按钮大小控制 */
+.apply-modification-btn {
+    /* 基础尺寸设置 */
+    height: 40px; /* 按钮高度（与输入框一致，视觉对齐） */
+    padding: 0 20px; /* 左右内边距（控制按钮宽度） */
+    font-size: 14px; /* 文字大小 */
+    
+    /* 其他样式（与现有按钮风格统一） */
+    background-color: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px; /* 图标与文字间距 */
+    transition: background-color 0.2s ease;
+}
+
+/* 按钮 hover 效果 */
+.apply-modification-btn:hover {
+    background-color: #45a049;
+}
+
+/* 图标大小控制（可选） */
+.apply-modification-btn i {
+    font-size: 16px; /* 图标大小 */
 }
