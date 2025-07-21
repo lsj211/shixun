@@ -808,7 +808,7 @@ async function generateNextContentFromAPI(choice) {
 
         if (nextChapter == chapterCount && nextScene === scenesPerChapter) { 
             // 如果已经是最后一章的最后一幕，直接返回结局
-            return generateStoryEnding(choice);
+            return generateStoryEndingStreaming(choice);
         }
 
         // 检查是否需要进入下一章

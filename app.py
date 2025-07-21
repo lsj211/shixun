@@ -21,7 +21,7 @@ try:
 except ImportError:
     print("警告: python-dotenv 未安装，尝试直接使用环境变量")
 
-    
+
 import nltk
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
@@ -110,7 +110,7 @@ try:
         model_name="qwen-max",
         temperature=0.7,
         top_p=0.8,
-        max_tokens=500,
+        max_tokens=200,
         streaming=True,  # 开启流式输出
     )
     print("成功初始化通义千问模型")
@@ -331,7 +331,7 @@ def retrieve_relevant_content(query: str, genre: str, k: int = 3):
     print(f"检索到 {len(results)} 条相关内容")
     return results
 
-stroytheme=None
+storytheme=None
 
 from classify import classifier  # 导入分类器
 
@@ -349,7 +349,8 @@ async def generate_background(request: BackgroundGenerationRequest):
     # genre = "玄幻"  # 假设从分类模型中得到了该结果
     genre = result["labels"][0]
 
-    stroytheme=genre
+    global storytheme
+    storytheme=genre
 
     # 步骤 2: 基于小说类型检索相关内容
     relevant_content = retrieve_relevant_content(request.background, genre)
@@ -789,7 +790,7 @@ async def generate_story_title(request: StoryTitleRequest):
         "2. 与故事的基调(如悬疑/奇幻/爱情)相匹配\n"
         "3. 具有一定的吸引力和独特性\n"
         "4. 长度适中(5-15个字为宜)\n\n"
-        f"6. 小说的主题为{stroytheme}\n\n"
+        f"6. 小说的主题为{storytheme}\n\n"
         "返回格式：\n"
         "主标题 | 副标题(如果有)"
     )
@@ -1037,8 +1038,8 @@ async def generate_next_scene(request: dict):  # 简化为dict以避免严格的
     is_chapter_finale = request.get('isChapterFinale', request.get('sceneNumber', 1) >= scenes_per_chapter)
     chapter_count = request.get('chapterCount', 5)
 
-
-    relevant_content=retrieve_relevant_content(request.get('selectedChoice', {}).get('nextContent', ''),stroytheme)
+    global storytheme
+    relevant_content=retrieve_relevant_content(request.get('selectedChoice', {}).get('nextContent', ''),storytheme)
 
     # 构建提示模板，增加章节结构相关指导
     system_template = (
