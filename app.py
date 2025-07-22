@@ -1628,7 +1628,6 @@ async def generate_story_tree(request: StoryTreeRequest):
 
 
 
-
 @app.post("/api/generate-chapter-titles")
 async def generate_chapter_titles(request: StoryTreeRequest):
     """生成章节标题列表"""
@@ -1687,6 +1686,7 @@ async def generate_chapter_titles(request: StoryTreeRequest):
                 raise ValueError("返回的不是有效的标题列表")
             
             # 确保标题数量正确
+
             if len(titles) < request.chapterCount:
                 print(f"警告: 标题数量不足（预期{request.chapterCount}，实际{len(titles)}）")
                 for i in range(len(titles), request.chapterCount):
@@ -1781,8 +1781,84 @@ async def generate_specific_chapter(request: SpecificChapterRequest):
         print(f"生成特定章节内容失败: {e}")
         raise HTTPException(status_code=500, detail=f"生成特定章节内容失败: {str(e)}")
 
+@app.post("/api/generate-specific-chapter1")
+async def generate_specific_chapter1(request: SpecificChapterRequest):
+    """生成特定章节的内容（实时流式输出每个文本片段）"""
+    # 1. 构建提示模板（保持不变）
+    system_template = (
+        "你是一位专业的小说作家，请根据提供的故事背景、角色信息和前面章节内容，"
+        f"创作第{request.chapterNumber}章的具体内容。\n\n"
+        f"整个故事共{request.chapterCount}章，当前是第{request.chapterNumber}章。\n\n"
+        "请遵循以下要求：\n"
+        "1. 内容应与前面章节保持连贯性\n"
+        "2. 章节内容应围绕当前章节标题展开\n"
+        "3. 根据章节在故事中的位置微调各章节的叙事节奏\n"
+        "4. 确保所有主要角色都有适当的戏份\n"
+        "5. 内容需要连贯，形成一个完整的故事线\n\n"
+        "请直接返回章节的详细内容文本，不要包含任何额外的解释或说明文字。"
+    )
+    
+    # 构建前面章节的摘要
+    previous_chapters_summary = ""
+    if request.previousChapters:
+        previous_chapters_summary = "前面章节全部内容：\n"
+        for i, chapter in enumerate(request.previousChapters):
+            previous_chapters_summary += f"第{i+1}章《{chapter.title}》：{chapter.content}\n\n"
+    
+    # f"角色信息:\n{[f'{c["name"]}: {c["description"]}' for c in request.characters]}\n\n"
+    character_info = "\n".join([f"{c['name']}: {c['description']}" for c in request.characters])
+    final_string = f"角色信息:\n{character_info}\n\n"
 
-
+    human_template = (
+        f"故事背景: {request.background}\n\n"
+        f"角色信息:\n{character_info}\n\n"
+        f"{previous_chapters_summary}"
+        f"当前章节: 第{request.chapterNumber}章《{request.currentChapterTitle}》\n\n"
+        f"请创作第{request.chapterNumber}章的详细内容。"
+    )
+    
+    messages = [
+        SystemMessage(content=system_template),
+        HumanMessage(content=human_template)
+    ]
+    
+    # 2. 流式生成并返回内容（核心修改）
+    async def event_generator():
+        try:
+            # chat_model = ChatTongyi(
+            #     api_key=DASHSCOPE_API_KEY,
+            #     model_name="qwen-max",
+            #     temperature=0.7,
+            #     top_p=0.8,
+            #     max_tokens=200,
+            #     streaming=True,  # 开启流式输出
+            # )
+            
+            # 实时获取模型生成的每个片段
+            full_content = ""  # 用于拼接完整内容（可选，用于日志或存储）
+            async for chunk in chat_model.astream(messages):
+                if chunk.content:  # 确保内容不为空
+                    content_chunk = chunk.content
+                    full_content += content_chunk
+                    
+                    # 以SSE格式发送单个文本片段（仅发送内容，不包装JSON）
+                    yield f"data: {content_chunk}\n\n"
+                    
+                    # 模拟生成延迟（可选，避免片段过小）
+                    await asyncio.sleep(0.05)
+            
+            # 生成完成后发送结束标记（可选）
+            yield "data: [END]\n\n"
+            
+        except Exception as e:
+            print(f"生成失败: {e}")
+            yield f"data: [ERROR] {str(e)}\n\n"
+    
+    # 3. 返回流式响应，指定SSE媒体类型
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream"
+    )
 
 class laterChapterRequest(BaseModel):
     background: str
@@ -1888,6 +1964,242 @@ async def generate_later_chapters(request: laterChapterRequest):
     except Exception as e:
         print(f"生成失败: {e}")
         raise HTTPException(status_code=500, detail=f"生成失败: {str(e)}")
+
+
+    
+    # except Exception as e:
+    #     print(f"生成后续章节内容失败: {e}")
+    #     raise HTTPException(status_code=500, detail=f"生成后续章节内容失败: {str(e)}")
+
+
+
+# class ChapterInfo(BaseModel):
+#     id: int
+#     title: str
+#     content: str
+
+class SpecificChapterRequest(BaseModel):
+    background: str
+    characters: List[Dict[str, Any]]
+    complexity: str = "medium"
+    currentChapterNumber: int
+    currentChapterTitle: str
+    currentChapterContent: str
+    chapterCount: int
+    currentInput: str
+    previousChapters: List[ChapterInfo] = []
+
+# @app.post("/api/generate-text-change")
+# async def generate_text_change(request: SpecificChapterRequest):
+#     """根据用户输入修改当前章节内容和标题（流式输出）"""
+#     try:
+#         # 构建系统提示，严格限定只修改当前章节
+#         system_template = (
+#             "你是一位专业的小说编辑专家。用户将提供一个章节的内容和标题，以及对该章节的修改意见。\n\n"
+#             "请根据用户的修改意见，对当前章节的内容和标题进行精准修改。在修改时，请遵循以下原则：\n"
+#             "1. 只修改当前章节，不生成任何后续章节内容\n"
+#             "2. 一定程度上保留原章节中与修改意见无关的内容，主要修改与用户意见相关的部分\n"
+#             "3. 保持故事的连贯性和逻辑性\n"
+#             "4. 不要改变故事的核心设定和主要人物，除非用户明确要求\n\n"
+#              "请以JSON格式返回结果，严格包含以下字段："
+#             "{\"title\": \"修改后的章节标题\", \"content\": \"修改后的章节内容\"}"
+#             "确保输出是有效的JSON数组，不要包含任何额外的解释或说明文字。"
+#         )
+        
+#         # 构建前面章节的摘要
+#         previous_chapters_summary = ""
+#         if request.previousChapters:
+#             previous_chapters_summary = "前面章节全部内容：\n"
+#             for i, chapter in enumerate(request.previousChapters):
+#                 previous_chapters_summary += f"第{i+1}章《{chapter.title}》：{chapter.content}\n\n"
+        
+#         # 构建用户提示，包含原始章节内容和修改意见
+#         human_template = (
+#             f"故事背景: {request.background}\n\n"
+#             f"角色信息:\n{format_characters(request.characters)}\n\n"
+#             f"{previous_chapters_summary}"
+#             f"当前章节: 第{request.currentChapterNumber}章《{request.currentChapterTitle}》\n\n"
+#             f"章节内容:\n{request.currentChapterContent}\n\n"
+#             f"用户修改意见:\n{request.currentInput}\n\n"
+#         )
+        
+#         messages = [
+#             SystemMessage(content=system_template),
+#             HumanMessage(content=human_template)
+#         ]
+        
+#         # 创建异步生成器函数
+#         async def stream_generator():
+#             title_received = False
+#             title = ""
+#             content = ""
+            
+#             async for chunk in chat_model.astream(messages):
+#                 if not chunk.content:
+#                     continue
+                    
+#                 chunk_text = chunk.content
+                
+#                 # 处理标题和内容的分离
+#                 if not title_received:
+#                     # 检查是否包含标题行
+#                     if "标题：" in chunk_text:
+#                         title_index = chunk_text.index("标题：")
+#                         after_title = chunk_text[title_index + 3:].strip()
+                        
+#                         # 查找标题后的换行符
+#                         newline_index = after_title.find("\n")
+#                         if newline_index != -1:
+#                             title = after_title[:newline_index].strip()
+#                             content = after_title[newline_index + 1:].strip()
+#                             title_received = True
+                            
+#                             # 发送标题
+#                             yield json.dumps({"type": "title", "data": title}) + "\n"
+                            
+#                             # 如果有内容，发送内容块
+#                             if content:
+#                                 yield json.dumps({"type": "content", "data": content}) + "\n"
+#                         else:
+#                             # 标题行但没有换行符
+#                             title = after_title.strip()
+#                             title_received = True
+#                             yield json.dumps({"type": "title", "data": title}) + "\n"
+#                     else:
+#                         # 还没找到标题行，继续积累
+#                         continue
+#                 else:
+#                     # 已经有标题，直接添加到内容
+#                     content += chunk_text
+#                     yield json.dumps({"type": "content", "data": chunk_text}) + "\n"
+            
+#             # 发送结束标记
+#             yield json.dumps({"type": "done", "data": None}) + "\n"
+        
+#         # 返回流式响应
+#         return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
+        
+#     except Exception as e:
+#         print(f"生成文本修改结果失败: {e}")
+#         # 错误处理
+#         async def error_generator():
+#             yield json.dumps({"type": "error", "data": str(e)}) + "\n"
+        
+#         return StreamingResponse(error_generator(), media_type="application/x-ndjson")
+
+
+
+
+
+@app.post("/api/generate-text-change")
+async def generate_text_change(request: SpecificChapterRequest):
+    """根据用户输入修改当前章节内容和标题（流式输出）"""
+    try:
+        # 构建系统提示（保持原格式要求不变）
+        system_template = (
+            "你是一位专业的小说编辑专家。用户将提供一个章节的内容和标题，以及对该章节的修改意见。\n\n"
+            "请根据用户的修改意见，对当前章节的内容和标题进行精准修改。在修改时，请遵循以下原则：\n"
+            "1. 只修改当前章节，不生成任何后续章节内容\n"
+            "2. 一定程度上保留原章节中与修改意见无关的内容，主要修改与用户意见相关的部分\n"
+            "3. 保持故事的连贯性和逻辑性\n"
+            "4. 不要改变故事的核心设定和主要人物，除非用户明确要求\n\n"
+            "请以JSON格式返回结果，严格包含以下字段："
+            "{\"title\": \"修改后的章节标题\", \"content\": \"修改后的章节内容\"}"
+            "生成规则：\n"
+            "1. 先完整生成title字段，再逐步生成content字段\n"
+            "2. JSON结构必须完整（确保最终可解析），但生成过程中允许不完整\n"
+            "3. 不包含任何额外内容，仅返回JSON字符串"
+        )
+        
+        # 构建提示信息（保持不变）
+        previous_chapters_summary = ""
+        if request.previousChapters:
+            previous_chapters_summary = "前面章节全部内容：\n"
+            for i, chapter in enumerate(request.previousChapters):
+                previous_chapters_summary += f"第{i+1}章《{chapter.title}》：{chapter.content}\n\n"
+        
+        human_template = (
+            f"故事背景: {request.background}\n\n"
+            f"角色信息:\n{format_characters(request.characters)}\n\n"
+            f"{previous_chapters_summary}"
+            f"当前章节: 第{request.currentChapterNumber}章《{request.currentChapterTitle}》\n\n"
+            f"章节内容:\n{request.currentChapterContent}\n\n"
+            f"用户修改意见:\n{request.currentInput}\n\n"
+        )
+        
+        messages = [
+            SystemMessage(content=system_template),
+            HumanMessage(content=human_template)
+        ]
+        
+        async def stream_generator():
+            accumulated_json = ""
+            title_sent = False
+            last_content_pos = 0
+            
+            async for chunk in chat_model.astream(messages):
+                if not chunk.content:
+                    continue
+                
+                accumulated_json += chunk.content
+                
+                # 1. 精确解析标题字段（改进点）
+                if not title_sent:
+                    # 查找 "title": " 模式的起始位置
+                    title_start = accumulated_json.find('"title": "')
+                    if title_start != -1:
+                        # 计算标题内容的起始位置
+                        content_start = title_start + len('"title": "')
+                        # 查找标题结束的引号（注意转义引号）
+                        title_end = accumulated_json.find('"', content_start)
+                        
+                        # 如果找到完整的标题结束引号
+                        if title_end != -1:
+                            title = accumulated_json[content_start:title_end]
+                            # 发送标题并标记已发送
+                            yield json.dumps({"type": "title", "data": title}) + "\n"
+                            title_sent = True
+                
+                # 2. 解析内容字段（与之前相同）
+                if title_sent:
+                    try:
+                        # 尝试解析完整JSON（仅用于提取content）
+                        # 注意：这里仍可能解析不完整，但只在标题已发送后尝试
+                        fixed_json = accumulated_json
+                        if fixed_json.count('"') % 2 != 0:
+                            fixed_json += '"'
+                        if fixed_json.count('{') > fixed_json.count('}'):
+                            fixed_json += '}' * (fixed_json.count('{') - fixed_json.count('}'))
+                        
+                        parsed = json.loads(fixed_json)
+                        
+                        if "content" in parsed:
+                            current_content = parsed["content"]
+                            if len(current_content) > last_content_pos:
+                                new_content = current_content[last_content_pos:]
+                                yield json.dumps({"type": "content", "data": new_content}) + "\n"
+                                last_content_pos = len(current_content)
+                                await asyncio.sleep(0.05)
+                    
+                    except json.JSONDecodeError:
+                        continue
+            
+            # 发送完成标记
+            if title_sent:
+                yield json.dumps({"type": "done", "data": None}) + "\n"
+            else:
+                # 容错处理
+                yield json.dumps({"type": "title", "data": f"第{request.currentChapterNumber}章（修改后）"}) + "\n"
+                yield json.dumps({"type": "content", "data": accumulated_json.strip()}) + "\n"
+                yield json.dumps({"type": "done", "data": None}) + "\n"
+        
+        return StreamingResponse(stream_generator(), media_type="application/x-ndjson")
+        
+    except Exception as e:
+        print(f"生成失败: {e}")
+        async def error_generator():
+            yield json.dumps({"type": "error", "data": str(e)}) + "\n"
+        return StreamingResponse(error_generator(), media_type="application/x-ndjson")
 
 
 

@@ -113,8 +113,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     const data = JSON.parse(localStorage.getItem(key) || '{}');
                     console.log(key)
                     const date = new Date(Number(key.replace(/.*_/, '')));
-                    // console.log(data)
-                    const label = `${date.toLocaleString()} - ${data.background ? data.background.slice(0, 10) : '无背景'}`;
+                    console.log(data)
+                    const label = `${date.toLocaleString()} - ${data.title ? data.title : data.background.slice(0, 10)}`;
                     const option = document.createElement('option');
                     option.value = key;
                     option.textContent = label;
@@ -170,6 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedKey = archiveSelect.value;
             if (selectedKey) {
                 if (currentMode === 'game') {
+                    const userId = JSON.parse(localStorage.getItem('token')).userId;
                     localStorage.setItem(`gameSettings_current_${userId}`, selectedKey);
                     window.location.href = `game.html?userId=${userId}&archive=${encodeURIComponent(selectedKey)}`;
                     // window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
@@ -495,7 +496,7 @@ const createSteps = [
                 }
             });
             // 存储设置
-            localStorage.setItem('gameSettings', JSON.stringify(settings));
+            localStorage.setItem('creatorsettings', JSON.stringify(settings));
             // 跳转
             window.location.href = 'creator.html';
         });

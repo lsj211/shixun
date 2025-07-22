@@ -1,655 +1,3 @@
-//1502行新生成内容
-
-
- // 游戏状态管理
-// const gameState = {
-//     storyBackground: "",
-//     characters: [],
-//     currentChapter: 1,
-//     currentNode: null,
-//     selectedTheme: "",
-//     storyTree: [],
-//     currentChoices: [],
-//     history: [],
-//     gameLog: [],
-//     settings: {
-//         complexity: "medium",
-//         chapterCount: 5
-//     },
-//     imageSettings: {
-//         lastDescription: '',
-//         lastStyle: 'realistic',
-//         lastColorTone: 'warm',
-//         lastRequirements: ''
-//     }
-// };
-
-// // 修改示例故事内容库
-// const storyContent = {
-//     chapters: [
-//         {
-//             id: 1,
-//             title: "第一章：命运的开端",
-//             content: "在一个平凡的早晨，主角收到了一封神秘的信件，上面记载着一个古老的预言...",
-//             editable: true,
-//             choices: []
-//         },
-//         {
-//             id: 2,
-//             title: "第二章：隐秘真相",
-//             content: "随着调查的深入，主角发现这个城市地下似乎隐藏着一个庞大的秘密组织...",
-//             editable: true,
-//             choices: []
-//         },
-//         {
-//             id: 3,
-//             title: "第三章：命运交织",
-//             content: "不同的人物命运开始交织，每个人似乎都与这个预言有着千丝万缕的联系...",
-//             editable: true,
-//             choices: []
-//         },
-//         {
-//             id: 4,
-//             title: "第四章：真相浮现",
-//             content: "随着更多线索的出现，预言背后的真相逐渐浮出水面，一切都指向了那个古老的传说...",
-//             editable: true,
-//             choices: []
-//         },
-//         {
-//             id: 5,
-//             title: "第五章：终极抉择",
-//             content: "面对最终的真相，主角必须做出选择，这个选择将影响整个世界的命运...",
-//             editable: true,
-//             choices: []
-//         }
-//     ]
-// };
-
-// // 当前游戏状态
-// let currentStoryNode = storyContent.chapters[0];
-
-// // 初始化游戏
-// function initializeGame() {
-//     // 初始化所有章节
-//     gameState.storyTree = storyContent.chapters;
-    
-//     // 设置当前节点为第一章
-//     currentStoryNode = storyContent.chapters[0];
-    
-//     // 显示初始内容
-//     updateStoryDisplay(currentStoryNode);
-    
-//     // 渲染所有章节到剧情树
-//     const treeContainer = document.getElementById('storyTree');
-//     treeContainer.innerHTML = ''; // 清空现有内容
-    
-//     storyContent.chapters.forEach(chapter => {
-//         addToStoryTree(chapter);
-//     });
-    
-//     // 高亮第一章
-//     highlightCurrentNode(1);
-    
-//     // 添加初始化记录
-//     addToHistory({
-//         title: "初始化",
-//         content: "故事创建完成，包含五个主要章节"
-//     });
-// }
-
-// // 更新故事显示
-// function updateStoryDisplay(node) {
-//     // 更新标题
-//     document.getElementById('currentStageTitle').textContent = node.title;
-    
-//     // 更新内容并设置为可编辑
-//     const storyTextElement = document.getElementById('storyText');
-//     storyTextElement.textContent = node.content;
-//     storyTextElement.contentEditable = node.editable || false;
-//     storyTextElement.dataset.nodeId = node.id;
-    
-//     // 绑定内容变更事件
-//     storyTextElement.onblur = function() {
-//         if (parseInt(this.dataset.nodeId) === currentStoryNode.id) {
-//             currentStoryNode.content = this.textContent;
-//             addToHistory({
-//                 title: "编辑",
-//                 content: "修改了剧情内容"
-//             });
-//         }
-//     };
-    
-//     // 更新章节信息
-//     document.getElementById('currentChapter').textContent = node.title;
-    
-//     // 生成新的场景图片
-//     regenerateImage(node.content);
-    
-//     // 将节点添加到剧情树
-//     addToStoryTree(node);
-    
-//     // 高亮当前节点
-//     highlightCurrentNode(node.id);
-    
-//     // 隐藏选择按钮区域
-//     document.querySelector('.choices-container').style.display = 'none';
-// }
-
-// // 高亮当前节点
-// function highlightCurrentNode(nodeId) {
-//     const nodes = document.querySelectorAll('.tree-node');
-//     nodes.forEach(node => {
-//         const titleElement = node.querySelector('.tree-node-title');
-//         if (titleElement && titleElement.dataset.id === String(nodeId)) {
-//             node.classList.add('active');
-//         } else {
-//             node.classList.remove('active');
-//         }
-//     });
-// }
-
-// // 添加到剧情树
-// function addToStoryTree(node) {
-//     // 检查节点是否已存在
-//     const existingNode = document.querySelector(`.tree-node-title[data-id="${node.id}"]`);
-//     if (existingNode) {
-//         // 如果节点已存在，只更新标题（如果有变化）
-//         if (existingNode.textContent !== node.title) {
-//             existingNode.textContent = node.title;
-//         }
-//         return;
-//     }
-    
-//     const treeContainer = document.getElementById('storyTree');
-//     const nodeElement = document.createElement('div');
-//     nodeElement.className = 'tree-node';
-    
-//     // 创建标题元素
-//     const titleElement = document.createElement('div');
-//     titleElement.className = 'tree-node-title';
-//     titleElement.textContent = node.title;
-//     titleElement.dataset.id = node.id; // 添加唯一标识
-    
-//     // 创建生成按钮
-//     const generateBtn = document.createElement('button');
-//     generateBtn.className = 'tree-node-generate';
-//     generateBtn.innerHTML = '<i class="fas fa-magic"></i> 生成内容';
-//     generateBtn.title = '生成该节点的详细内容';
-    
-//     // 组装节点
-//     nodeElement.appendChild(titleElement);
-//     nodeElement.appendChild(generateBtn);
-//     treeContainer.appendChild(nodeElement);
-    
-//     // 添加点击事件 - 编辑标题
-//     titleElement.addEventListener('click', function(e) {
-//         // 如果已经在编辑模式则不重复处理
-//         if (this.classList.contains('edit-mode')) return;
-        
-//         // 阻止事件冒泡到节点，避免选中节点
-//         e.stopPropagation();
-        
-//         this.classList.add('edit-mode');
-//         this.contentEditable = true;
-//         this.focus();
-        
-//         // 保存原始标题
-//         const originalTitle = this.textContent;
-        
-//         // 处理编辑完成
-//         const finishEditing = () => {
-//             this.classList.remove('edit-mode');
-//             this.contentEditable = false;
-            
-//             // 如果标题有变化，更新相关内容
-//             if (this.textContent.trim() && this.textContent !== originalTitle) {
-//                 const newTitle = this.textContent.trim();
-//                 this.textContent = newTitle;
-                
-//                 // 如果是当前节点，同步更新故事区域标题
-//                 if (currentStoryNode.id === parseInt(this.dataset.id)) {
-//                     currentStoryNode.title = newTitle;
-//                     document.getElementById('currentStageTitle').textContent = newTitle;
-//                     document.getElementById('currentChapter').textContent = newTitle;
-//                 }
-                
-//                 addToHistory({
-//                     title: "编辑",
-//                     content: `修改了章节标题：${newTitle}`
-//                 });
-//             } else {
-//                 // 恢复原始标题
-//                 this.textContent = originalTitle;
-//             }
-//         };
-        
-//         // 失去焦点时完成编辑
-//         this.addEventListener('blur', finishEditing, { once: true });
-        
-//         // 按下Enter键完成编辑，Esc键取消
-//         this.addEventListener('keydown', function(e) {
-//             if (e.key === 'Enter' && !e.shiftKey) {
-//                 e.preventDefault();
-//                 finishEditing();
-//             } else if (e.key === 'Escape') {
-//                 e.preventDefault();
-//                 this.textContent = originalTitle;
-//                 finishEditing();
-//             }
-//         }, { once: true });
-//     });
-    
-//     // 添加生成按钮点击事件
-//     generateBtn.addEventListener('click', function(e) {
-//         e.stopPropagation(); // 防止触发标题编辑
-        
-//         const nodeTitle = titleElement.textContent;
-//         const nodeId = titleElement.dataset.id;
-        
-//         // 显示生成中提示
-//         this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
-//         this.disabled = true;
-        
-//         // 模拟生成过程
-//         setTimeout(() => {
-//             // 恢复按钮状态
-//             this.innerHTML = '<i class="fas fa-magic"></i> 生成内容';
-//             this.disabled = false;
-            
-//             // 实际应用中，这里应该调用API生成内容
-//             // 并更新到对应的节点
-//             if (parseInt(nodeId) === currentStoryNode.id) {
-//                 // 如果是当前节点，更新内容
-//                 generateDetailedContent(nodeTitle).then(detailedContent => {
-//                     currentStoryNode.content = detailedContent;
-//                     document.getElementById('storyText').textContent = detailedContent;
-                    
-//                     // 标记内容为可编辑
-//                     currentStoryNode.editable = true;
-                    
-//                     addToHistory({
-//                         title: "生成内容",
-//                         content: `为"${nodeTitle}"生成了详细内容`
-//                     });
-//                 });
-//             } else {
-//                 alert(`已为"${nodeTitle}"生成了详细内容！`);
-//             }
-//         }, 1500);
-//     });
-    
-//     // 添加节点点击事件 - 切换当前节点
-//     nodeElement.addEventListener('click', function() {
-//         // 移除其他节点的active类
-//         document.querySelectorAll('.tree-node').forEach(n => {
-//             n.classList.remove('active');
-//         });
-//         // 为当前点击的节点添加active类
-//         this.classList.add('active');
-        
-//         // 切换到该节点的内容
-//         const nodeId = this.querySelector('.tree-node-title').dataset.id;
-//         if (parseInt(nodeId) !== currentStoryNode.id) {
-//             // 从storyTree中找到对应节点
-//             let targetNode = gameState.storyTree.find(node => node.id === parseInt(nodeId));
-            
-//             if (!targetNode) {
-//                 // 如果节点不存在，使用模拟数据
-//                 targetNode = {
-//                     id: parseInt(nodeId),
-//                     title: this.querySelector('.tree-node-title').textContent,
-//                     content: `这是${this.querySelector('.tree-node-title').textContent}的内容...`,
-//                     editable: true,
-//                     choices: []
-//                 };
-                
-//                 // 添加到storyTree
-//                 gameState.storyTree.push(targetNode);
-//             }
-            
-//             currentStoryNode = targetNode;
-//             updateStoryDisplay(targetNode);
-            
-//             addToHistory({
-//                 title: "切换章节",
-//                 content: `切换到"${targetNode.title}"`
-//             });
-//         }
-//     });
-    
-//     // 将节点添加到storyTree
-//     if (!gameState.storyTree.some(node => node.id === parseInt(node.id))) {
-//         gameState.storyTree.push(node);
-//     }
-    
-//     return nodeElement;
-// }
-
-// // 生成详细内容（模拟）
-// async function generateDetailedContent(title) {
-//     // 这里应该调用AI API生成详细内容
-//     return `${title}的详细内容...\n\n这是一段由AI生成的详细描述，讲述了${title}的背景故事和相关情节。这里可以包含更多的细节、环境描写、角色互动等内容，使故事更加丰富生动。你可以直接编辑这段内容来修改剧情。`;
-// }
-
-// // 重新生成图片
-// function regenerateImage(description) {
-//     // 这里应该调用 AI API 来生成图片
-//     // 现在使用随机占位图片模拟
-//     const randomSize = Math.floor(Math.random() * 200) + 800;
-//     document.getElementById('storyImage').src = `https://via.placeholder.com/${randomSize}x400`;
-// }
-
-// // 初始化编辑功能
-// function initializeEditFeatures() {
-//     // 编辑标题
-//     document.querySelector('.edit-title-btn').addEventListener('click', () => {
-//         const modal = document.getElementById('editModal');
-//         const input = document.getElementById('modalInput');
-//         input.value = currentStoryNode.title;
-        
-//         modal.classList.add('active');
-//         document.querySelector('.save-modal-btn').onclick = () => {
-//             currentStoryNode.title = input.value;
-//             document.getElementById('currentStageTitle').textContent = input.value;
-//             document.getElementById('currentChapter').textContent = input.value;
-//             modal.classList.remove('active');
-//             addToHistory({
-//                 title: "编辑",
-//                 content: `修改了标题：${input.value}的标题`
-//             });
-//         };
-//     });
-
-//     // 编辑剧情
-//     document.querySelector('.edit-story-btn').addEventListener('click', () => {
-//         const modal = document.getElementById('editModal');
-//         const input = document.getElementById('modalInput');
-//         input.value = currentStoryNode.content;
-        
-//         modal.classList.add('active');
-//         document.querySelector('.save-modal-btn').onclick = () => {
-//             currentStoryNode.content = input.value;
-//             document.getElementById('storyText').textContent = input.value;
-//             modal.classList.remove('active');
-//             addToHistory({
-//                 title: "编辑",
-//                 content: "修改了剧情内容"
-//             });
-//         };
-//     });
-
-//     // 关闭模态框
-//     document.querySelector('.close-modal').addEventListener('click', () => {
-//         document.getElementById('editModal').classList.remove('active');
-//     });
-    
-//     document.querySelector('.cancel-modal-btn').addEventListener('click', () => {
-//         document.getElementById('editModal').classList.remove('active');
-//     });
-// }
-
-// // 初始化故事信息按钮
-// function initializeStoryInfoButtons() {
-//     // 故事背景按钮
-//     const storyInfoBtn = document.querySelector('.story-info-btn');
-//     const storyInfoModal = document.getElementById('storyInfoModal');
-    
-//     storyInfoBtn.addEventListener('click', () => {
-//         updateStoryInfoContent();
-//         storyInfoModal.classList.add('active');
-//     });
-
-//     // 角色设定按钮
-//     const characterInfoBtn = document.querySelector('.character-info-btn');
-//     const characterInfoModal = document.getElementById('characterInfoModal');
-    
-//     characterInfoBtn.addEventListener('click', () => {
-//         updateCharacterInfoContent();
-//         characterInfoModal.classList.add('active');
-//     });
-
-//     // 关闭按钮
-//     document.querySelectorAll('.close-modal').forEach(btn => {
-//         btn.addEventListener('click', (e) => {
-//             e.target.closest('.modal').classList.remove('active');
-//         });
-//     });
-// }
-
-// // 更新故事背景内容
-// function updateStoryInfoContent() {
-//     // 更新世界观设定
-//     document.getElementById('worldBackground').textContent = gameState.storyBackground || "这是一个充满奇幻与神秘的世界，各种超自然现象时有发生...";
-
-//     // 更新时间线
-//     const timeline = document.getElementById('storyTimeline');
-//     timeline.innerHTML = gameState.history.map(event => `
-//         <div class="timeline-event">
-//             <h4>${event.title}</h4>
-//             <p>${event.content}</p>
-//         </div>
-//     `).join('');
-
-//     // 更新重要地点
-//     const locations = document.getElementById('importantLocations');
-//     // 这里应该从游戏状态中获取地点信息
-//     locations.innerHTML = [
-//         {
-//             name: "神秘房间",
-//             description: "故事开始的地方，充满了未解之谜..."
-//         },
-//         {
-//             name: "空旷街道",
-//             description: "被雾气笼罩的街道，似乎隐藏着什么..."
-//         },
-//         {
-//             name: "废弃工厂",
-//             description: "传闻中发生过神秘事件的地方，弥漫着诡异的气息..."
-//         }
-//     ].map(location => `
-//         <div class="location-card">
-//             <h4>${location.name}</h4>
-//             <p>${location.description}</p>
-//         </div>
-//     `).join('');
-// }
-
-// // 更新角色设定内容
-// function updateCharacterInfoContent() {
-//     const characterGrid = document.getElementById('characterGrid');
-    
-//     // 如果没有角色数据，添加一些示例角色
-//     if (gameState.characters.length === 0) {
-//         gameState.characters = [
-//             {
-//                 name: "主角",
-//                 description: "一位好奇心旺盛的年轻探险家，对神秘事件充满兴趣...",
-//                 traits: ["勇敢", "机智", "好奇心强"]
-//             },
-//             {
-//                 name: "神秘陌生人",
-//                 description: "在街道上遇到的神秘人物，似乎知道很多关于这个世界的秘密...",
-//                 traits: ["神秘", "沉默寡言", "观察力敏锐"]
-//             }
-//         ];
-//     }
-    
-//     characterGrid.innerHTML = gameState.characters.map(char => `
-//         <div class="character-info-card">
-//             <img class="character-info-image" src="https://via.placeholder.com/250x200" alt="${char.name}">
-//             <div class="character-info-details">
-//                 <h3>${char.name}</h3>
-//                 <p>${char.description}</p>
-//                 <div class="character-traits">
-//                     ${generateCharacterTraits(char)}
-//                 </div>
-//             </div>
-//         </div>
-//     `).join('');
-// }
-
-// // 生成角色特征标签
-// function generateCharacterTraits(character) {
-//     return (character.traits || []).map(trait => `
-//         <span class="character-trait">${trait}</span>
-//     `).join('');
-// }
-
-// // 修改添加历史记录的函数
-// function addToHistory(action) {
-//     const historyContainer = document.getElementById('storyHistory');
-//     const timestamp = new Date().toLocaleTimeString();
-    
-//     // 创建新的历史记录条目
-//     const entryElement = document.createElement('div');
-//     entryElement.className = 'history-entry';
-    
-//     // 根据操作类型设置不同的提示文本
-//     let actionText = '';
-//     if (action.type === 'edit' && currentStoryNode) {
-//         actionText = `修改了 ${currentStoryNode.title} 的内容`;
-//     } else if (action.type === 'image') {
-//         actionText = `为 ${currentStoryNode.title} 生成了新的场景图片`;
-//     } else if (action.type === 'title') {
-//         actionText = `修改了章节标题为：${currentStoryNode.title}`;
-//     } else {
-//         actionText = action.content;
-//     }
-    
-//     // 设置历史记录内容
-//     entryElement.innerHTML = `
-//         <span class="history-time">[${timestamp}]</span>
-//         <span class="history-text">${actionText}</span>
-//     `;
-    
-//     // 将新记录添加到容器中
-//     historyContainer.insertBefore(entryElement, historyContainer.firstChild);
-    
-//     // 自动滚动到最新记录
-//     historyContainer.scrollTop = historyContainer.scrollHeight;
-// }
-
-// // 在相关操作处调用 addToHistory
-// function editStoryContent() {
-//     if (!currentStoryNode) return;
-    
-//     const modal = document.getElementById('editModal');
-//     const input = document.getElementById('modalInput');
-//     input.value = currentStoryNode.content;
-//     modal.classList.add('active');
-    
-//     document.querySelector('.save-modal-btn').onclick = () => {
-//         currentStoryNode.content = input.value;
-//         document.getElementById('storyText').textContent = input.value;
-//         modal.classList.remove('active');
-        
-//         // 添加修改记录
-//         addToHistory({
-//             type: 'edit',
-//             content: `修改了 ${currentStoryNode.title} 的内容`
-//         });
-//     };
-// }
-
-// // 图片生成相关初始化
-// function initializeImageGeneration() {
-//     const regenerateBtn = document.querySelector('.regenerate-image-btn');
-//     const imageModal = document.getElementById('imageGenerateModal');
-    
-//     regenerateBtn.addEventListener('click', (e) => {
-//         e.preventDefault();
-        
-//         // 填充上次的设置
-//         document.getElementById('sceneDescription').value = gameState.imageSettings.lastDescription;
-//         document.getElementById('artStyle').value = gameState.imageSettings.lastStyle;
-//         document.getElementById('colorTone').value = gameState.imageSettings.lastColorTone;
-//         document.getElementById('additionalRequirements').value = gameState.imageSettings.lastRequirements;
-        
-//         imageModal.classList.add('active');
-//     });
-
-//     // 设置生成按钮事件
-//     document.querySelector('.generate-image-btn').addEventListener('click', async () => {
-//         const description = document.getElementById('sceneDescription').value;
-//         const style = document.getElementById('artStyle').value;
-//         const colorTone = document.getElementById('colorTone').value;
-//         const requirements = document.getElementById('additionalRequirements').value;
-        
-//         // 保存设置
-//         gameState.imageSettings = {
-//             lastDescription: description,
-//             lastStyle: style,
-//             lastColorTone: colorTone,
-//             lastRequirements: requirements
-//         };
-        
-//         // 显示加载状态
-//         const imgElement = document.getElementById('storyImage');
-//         imgElement.style.opacity = '0.5';
-        
-//         try {
-//             // 这里调用AI图片生成API
-//             const newImageUrl = await generateImage({
-//                 description,
-//                 style,
-//                 colorTone,
-//                 requirements
-//             });
-            
-//             // 更新图片
-//             imgElement.src = newImageUrl;
-//             imgElement.style.opacity = '1';
-            
-//             // 添加到历史记录
-//             addToHistory({
-//                 title: "生成插画",
-//                 content: `使用${style}风格生成了新的场景插画`
-//             });
-            
-//             // 关闭模态框
-//             imageModal.classList.remove('active');
-//         } catch (error) {
-//             console.error('生成图片失败:', error);
-//             alert('生成图片失败，请稍后重试');
-//         }
-//     });
-// }
-
-// // 添加图片生成函数
-// async function generateImage(settings) {
-//     // 这里应该是实际的AI API调用
-//     // 现在用随机占位图片模拟
-//     const styles = {
-//         realistic: '写实',
-//         anime: '动漫',
-//         watercolor: '水彩',
-//         oil: '油画',
-//         pixel: '像素'
-//     };
-    
-//     console.log('生成图片设置:', settings);
-    
-//     // 模拟API调用延迟
-//     await new Promise(resolve => setTimeout(resolve, 1500));
-    
-//     // 返回随机大小的占位图片
-//     const width = Math.floor(Math.random() * 200) + 800;
-//     const height = 400;
-//     return `https://via.placeholder.com/${width}x${height}?text=${styles[settings.style]}风格`;
-// }
-
-// // 在文档加载完成后初始化游戏
-// document.addEventListener('DOMContentLoaded', () => {
-//     initializeGame();
-//     initializeEditFeatures();
-//     initializeStoryInfoButtons();
-//     initializeImageGeneration();
-    
-//     // 设置一些初始故事背景
-//     gameState.storyBackground = "这是一个充满奇幻与神秘的世界，各种超自然现象时有发生。最近，一个小镇上发生了一系列离奇事件，引起了人们的恐慌和好奇...";
-// });
-
-
 let isRegenerating = false;
 // 游戏状态管理
 const gameState = {
@@ -678,15 +26,23 @@ function initializeCustomInput() {
     const inputElement = document.getElementById('storyCustomInput');
     const applyButton = document.querySelector('.apply-modification-btn');
     
+    window.customStoryInput = '请输入修改建议.......'; // 初始化全局变量
     // 从本地存储加载已保存的输入内容
-    const savedInput = localStorage.getItem('customStoryInput');
-    if (savedInput) {
-        inputElement.value = savedInput;
-    }
+    // const savedInput = localStorage.getItem('customStoryInput');
+    // if (savedInput) {
+    //     inputElement.value = savedInput;
+    // }
     
     // 绑定应用修改按钮点击事件
     applyButton.addEventListener('click', function() {
+        const chapterId = currentStoryNode?.id;
+
+
+
+
         saveCustomInput(inputElement);
+        console.log('应用修改按钮被点击，当前输入内容:',inputElement.value);
+        handleTextChange1(chapterId, inputElement.value);
     });
     
     // 绑定回车键触发保存
@@ -769,6 +125,7 @@ const storyContent = {
 
 // 当前游戏状态
 let currentStoryNode = storyContent.chapters[0];
+
 
 // 初始化游戏
 function initializeGame() {
@@ -968,7 +325,7 @@ function addToStoryTree(node) {
                     }
                     
                     addToHistory({
-                        title: "编辑",
+                        title: "编辑888",
                         content: `修改了章节标题：${newTitle}`
                     });
                 }
@@ -1334,7 +691,7 @@ async function handleContentChange(chapterId) {
 //     try {
 //         console.log(9999999999999999999999999999999999);
 //         // 获取故事背景和角色信息
-//         const settingsStr = localStorage.getItem('gameSettings');
+//         const settingsStr = localStorage.getItem('creatorsettings');
 //         if (!settingsStr) {
 //             throw new Error('未找到创作设定');
 //         }
@@ -1406,7 +763,7 @@ async function regenerateChapter(chapterId) {
     console.log("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa");
     try {
         // 获取故事背景和角色信息
-        const settingsStr = localStorage.getItem('gameSettings');
+        const settingsStr = localStorage.getItem('creatorsettings');
         if (!settingsStr) {
             throw new Error('未找到创作设定');
         }
@@ -1502,181 +859,265 @@ async function regenerateChapter(chapterId) {
 
 
 
-// /**
-//  * 处理文本内容修改并触发后续章节更新
-//  * @param {number} chapterId 当前章节ID
-//  * @param {string} inputContent 用户输入的新内容
-//  */
-// async function handleTextChange1(chapterId, inputContent) {
-//     if (isRegenerating) {
-//         showToast("系统正在处理中，请稍后再试", true);
-//         return;
-//     }
+/**
+ * 处理文本内容修改并触发后续章节更新
+ * @param {number} chapterId 当前章节ID
+ * @param {string} inputContent 用户输入的新内容
+ */
+async function handleTextChange1(chapterId, inputContent) {
+    if (isRegenerating) {
+        showToast("系统正在处理中，请稍后再试", true);
+        return;
+    }
     
-//     isRegenerating = true;
-//     const loadingMessage = `正在更新章节 ${chapterId} 及后续内容...`;
-//     showLoading(true, loadingMessage);
+    isRegenerating = true;
+    const loadingMessage = `正在更新章节 ${chapterId} 及后续内容...`;
+    // showLoading(true, loadingMessage);
     
-//     try {
-//         // 1. 更新当前章节内容
-//         const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
-//         if (!currentChapter) {
-//             throw new Error(`未找到章节 ${chapterId}`);
-//         }
+    try {
+        // 1. 更新当前章节内容
+        const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
+        if (!currentChapter) {
+            throw new Error(`未找到章节 ${chapterId}`);
+        }
         
-//         // 保存原始内容用于回滚
-//         const originalContent = currentChapter.content;
-//         currentChapter.content = inputContent;
+        // 保存原始内容用于回滚
+        const originalContent = currentChapter.content;
+        // currentChapter.content = inputContent;
         
-//         // 更新UI中的内容
-//         if (currentStoryNode.id === chapterId) {
-//             document.getElementById('storyText').textContent = inputContent;
-//         }
+        // 更新UI中的内容
+        // if (currentStoryNode.id === chapterId) {
+        //     document.getElementById('storyText').textContent = inputContent;
+        // }
         
-//         // 2. 重新生成当前及后续章节
-//         showLoading(true, `${loadingMessage}\n正在根据新内容生成后续章节...`);
+        // 2. 重新生成当前及后续章节
+        // showLoading(true, `${loadingMessage}\n正在根据新内容生成后续章节...`);
         
-//         // 调用 regenerateText 函数生成新内容
-//         const result = await regenerateText(chapterId, inputContent);
+        // 调用 regenerateText 函数生成新内容
+        const result = await regenerateText(chapterId, inputContent);
         
-//         // 3. 更新章节数据
-//         result.chapters.forEach(generatedChapter => {
-//             const targetIndex = gameState.storyTree.findIndex(c => c.id === generatedChapter.id);
-//             if (targetIndex > -1) {
-//                 // 更新已有章节
-//                 gameState.storyTree[targetIndex] = {
-//                     ...gameState.storyTree[targetIndex],
-//                     ...generatedChapter,
-//                     generated: true // 标记为已生成
-//                 };
-//             } else {
-//                 // 添加新章节
-//                 gameState.storyTree.push({
-//                     ...generatedChapter,
-//                     generated: true
-//                 });
-//             }
-//         });
+        // 3. 更新章节数据
+        result.chapters.forEach(generatedChapter => {
+            const targetIndex = gameState.storyTree.findIndex(c => c.id === generatedChapter.id);
+            if (targetIndex > -1) {
+                // 更新已有章节
+                gameState.storyTree[targetIndex] = {
+                    ...gameState.storyTree[targetIndex],
+                    ...generatedChapter,
+                    generated: true // 标记为已生成
+                };
+            } else {
+                // 添加新章节
+                gameState.storyTree.push({
+                    ...generatedChapter,
+                    generated: true
+                });
+            }
+        });
         
-//         // 4. 更新UI
-//         renderChapterTitles(gameState.storyTree);
+        // 4. 更新UI
+        renderChapterTitles(gameState.storyTree);
         
-//         // 如果当前查看的是被更新的章节，刷新显示
-//         if (currentStoryNode.id >= chapterId) {
-//             const updatedChapter = gameState.storyTree.find(c => c.id === currentStoryNode.id);
-//             if (updatedChapter) {
-//                 document.getElementById('storyText').textContent = updatedChapter.content;
-//             }
-//         }
+        // 如果当前查看的是被更新的章节，刷新显示
+        if (currentStoryNode.id >= chapterId) {
+            const updatedChapter = gameState.storyTree.find(c => c.id === currentStoryNode.id);
+            if (updatedChapter) {
+                document.getElementById('storyText').textContent = updatedChapter.content;
+            }
+        }
         
-//         // 保存状态
-//         saveGameState();
-//         showToast("章节已成功更新！");
+        // 保存状态
+        saveGameState();
+        showToast("章节已成功更新！");
         
-//         // 添加成功历史记录
-//         addToHistory({
-//             title: "内容更新完成",
-//             content: `章节 ${chapterId} 内容已更新并重新生成相关章节`
-//         });
+        // 添加成功历史记录
+        addToHistory({
+            title: "内容更新完成",
+            content: `章节 ${chapterId} 内容已更新并重新生成相关章节`
+        });
         
-//     } catch (error) {
-//         console.error("内容更新失败:", error);
+    } catch (error) {
+        console.error("内容更新失败:", error);
         
-//         // 回滚内容更改
-//         if (currentChapter) {
-//             currentChapter.content = originalContent;
+        // 回滚内容更改
+        if (currentChapter) {
+            currentChapter.content = originalContent;
             
-//             if (currentStoryNode.id === chapterId) {
-//                 document.getElementById('storyText').textContent = originalContent;
-//             }
-//         }
+            if (currentStoryNode.id === chapterId) {
+                document.getElementById('storyText').textContent = originalContent;
+            }
+        }
         
-//         showToast("更新失败: " + error.message, true);
-//         addToHistory({
-//             title: "更新失败",
-//             content: `章节 ${chapterId} 内容更新失败: ${error.message}`
-//         });
-//     } finally {
-//         isRegenerating = false;
-//         showLoading(false);
-//     }
-// }
+        showToast("更新失败: " + error.message, true);
+        addToHistory({
+            title: "更新失败",
+            content: `章节 ${chapterId} 内容更新失败: ${error.message}`
+        });
+    } finally {
+        isRegenerating = false;
+        showLoading(false);
+    }
+}
 
-// /**
-//  * 根据用户输入内容生成当前及后续章节
-//  * @param {number} chapterId 当前章节ID
-//  * @param {string} inputContent 用户输入的新内容
-//  * @returns {Promise<{chapters: Array}>} 生成的章节数据
-//  */
-// async function regenerateText(chapterId, inputContent) {
-//     try {
-//         // 获取故事背景和角色信息
-//         const settingsStr = localStorage.getItem('gameSettings');
-//         if (!settingsStr) {
-//             throw new Error('未找到创作设定');
-//         }
-//         const settings = JSON.parse(settingsStr);
-        
-//         // 获取当前章节
-//         const chapter = gameState.storyTree.find(c => c.id === chapterId);
-//         if (!chapter) {
-//             throw new Error('未找到指定章节');
-//         }
-        
-//         // 收集前面章节的内容（包括当前修改的内容）
-//         const previousChapters = gameState.storyTree
-//             .filter(c => c.id <= chapterId && c.content) // 包含当前章节（使用修改后的内容）
-//             .map(c => ({
-//                 id: c.id,
-//                 title: c.title,
-//                 content: c.id === c.content 
-//             }));
-        
-//         // 构建请求参数（包含用户输入内容）
-//         const payload = {
-//             background: settings.background,
-//             characters: settings.characters,
-//             complexity: settings.complexity || "medium",
-//             chapterNumber: chapterId,
-//             chapterCount: gameState.storyTree.length,
-//             currentInput: inputContent, // 新增：用户输入的内容
-//             previousChapters: previousChapters // 前置章节内容（含当前修改）
-//         };
-        
-//         console.log("重新生成章节请求参数:", payload);
-        
-//         // 调用API生成当前及后续章节
-//         const response = await fetch("http://localhost:8000/api/generate-text-change", {
-//             method: 'POST',
-//             headers: { 
-//                 'Content-Type': 'application/json',
-//             },
-//             body: JSON.stringify(payload)
-//         });
-        
-//         if (!response.ok) {
-//             const errorData = await response.json();
-//             throw new Error(errorData.detail || `生成章节失败（${response.status}）`);
-//         }
-        
-//         const result = await response.json();
-        
-//         // 验证返回的章节数据
-//         if (!result.chapters || !Array.isArray(result.chapters)) {
-//             throw new Error('API返回格式错误，未找到章节列表');
-//         }
-        
-//         return result;
-        
-//     } catch (error) {
-//         console.error(`根据输入内容生成章节失败:`, error);
-//         showToast(`生成失败：${error.message}`, true);
-//         throw error; // 重新抛出错误，供上层处理
-//     }
-// }
-
-
-
+/**
+ * 根据用户输入内容生成当前及后续章节
+ * @param {number} chapterId 当前章节ID
+ * @param {string} inputContent 用户输入的新内容
+ * @returns {Promise<{chapters: Array}>} 生成的章节数据
+ */
+async function regenerateText(chapterId, inputContent) {
+    return new Promise((resolve, reject) => {
+        try {
+            // 获取故事背景和角色信息（保持不变）
+            const settingsStr = localStorage.getItem('creatorsettings');
+            if (!settingsStr) {
+                throw new Error('未找到创作设定');
+            }
+            const settings = JSON.parse(settingsStr);
+            
+            // 获取当前章节（保持不变）
+            const chapter = gameState.storyTree.find(c => c.id === chapterId);
+            if (!chapter) {
+                throw new Error('未找到指定章节');
+            }
+            
+            // 收集前面章节的内容（保持不变）
+            const previousChapters = gameState.storyTree
+                .filter(c => c.id < chapterId && c.content)
+                .map(c => ({
+                    id: c.id,
+                    title: c.title,
+                    content: c.content 
+                }));
+            
+            // 构建请求参数（保持不变）
+            const payload = {
+                background: settings.background,
+                characters: settings.characters,
+                complexity: settings.complexity || "medium",
+                currentChapterNumber: chapterId,
+                currentChapterTitle: chapter.title,
+                currentChapterContent: chapter.content,
+                chapterCount: gameState.storyTree.length,
+                currentInput: inputContent,
+                previousChapters: previousChapters
+            };
+            
+            console.log("重新生成章节请求参数:", payload);
+            
+            // 显示生成中提示
+            const storyTextElement = document.getElementById('storyText');
+            storyTextElement.textContent = '正在生成内容...';
+            storyTextElement.dataset.generating = 'true';
+            
+            // 调用API生成当前及后续章节（流式处理）
+            fetch("http://localhost:8000/api/generate-text-change", {
+                method: 'POST',
+                headers: { 
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`生成章节失败（${response.status}）`);
+                }
+                
+                if (!response.body) {
+                    throw new Error('响应没有body内容');
+                }
+                
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                
+                let receivedTitle = '';
+                let receivedContent = '';
+                let isDone = false;
+                
+                // 处理流式响应
+                const processStream = async () => {
+                    const { done, value } = await reader.read();
+                    
+                    if (done) {
+                        if (!isDone) {
+                            // 如果没有收到完成标记但流结束了，视为错误
+                            reject(new Error('流意外结束'));
+                        } else {
+                            // 构建最终结果
+                            const result = {
+                                chapters: [
+                                    {
+                                        id: chapterId,
+                                        title: receivedTitle,
+                                        content: receivedContent
+                                    }
+                                ]
+                            };
+                            
+                            resolve(result);
+                        }
+                        return;
+                    }
+                    
+                    // 解码数据块
+                    const chunk = decoder.decode(value, { stream: true });
+                    
+                    // 按行分割（每行是一个JSON对象）
+                    const lines = chunk.split('\n').filter(line => line.trim() !== '');
+                    
+                    for (const line of lines) {
+                        try {
+                            const data = JSON.parse(line);
+                            
+                            switch (data.type) {
+                                case 'title':
+                                    receivedTitle = data.data;
+                                    document.getElementById('currentChapter').textContent = receivedTitle;
+                                    document.getElementById('currentStageTitle').textContent = receivedTitle;
+                                    break;
+                                    
+                                case 'content':
+                                    receivedContent += data.data;
+                                    storyTextElement.textContent = receivedContent;
+                                    // 自动滚动到底部
+                                    storyTextElement.scrollTop = storyTextElement.scrollHeight;
+                                    break;
+                                    
+                                case 'error':
+                                    throw new Error(data.data);
+                                    
+                                case 'done':
+                                    isDone = true;
+                                    break;
+                            }
+                        } catch (e) {
+                            console.error("解析流数据失败:", e, "Line:", line);
+                            throw new Error("解析流数据失败: " + e.message);
+                        }
+                    }
+                    
+                    // 继续处理下一个数据块
+                    processStream();
+                };
+                
+                // 开始处理流
+                processStream();
+            })
+            .catch(error => {
+                console.error(`根据输入内容生成章节失败:`, error);
+                storyTextElement.textContent = '生成失败，请重试';
+                storyTextElement.dataset.generating = 'false';
+                showToast(`生成失败：${error.message}`, true);
+                reject(error);
+            });
+            
+        } catch (error) {
+            console.error(`根据输入内容生成章节失败:`, error);
+            showToast(`生成失败：${error.message}`, true);
+            reject(error);
+        }
+    });
+}
 
 
 
@@ -1696,7 +1137,7 @@ async function regenerateChapter(chapterId) {
 async function regenerateChapterContent(chapter, useNewTitle = false) {
     try {
         // 获取故事背景和角色信息
-        const settingsStr = localStorage.getItem('gameSettings');
+        const settingsStr = localStorage.getItem('creatorsettings');
         if (!settingsStr) {
             throw new Error('未找到创作设定');
         }
@@ -1745,6 +1186,12 @@ async function regenerateChapterContent(chapter, useNewTitle = false) {
         throw error; // 重新抛出错误
     }
 }
+
+
+
+
+
+
 function showToast(message, isError = false) {
     // 移除现有的通知
     const existingToast = document.querySelector('.custom-toast');
@@ -2102,12 +1549,53 @@ async function generateImage(settings) {
     const height = 400;
     return `test.png`;
 }
+async function generateCharacterImage(character) {
+    const imageElement = document.getElementById(`character-image-${character.name}`);
+    if (!imageElement) {
+        console.error(`未找到角色 ${character.name} 的图片元素`);
+        return;
+    }
 
+    try {
+        const response = await fetch('/api/generate-character-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: character.name,
+                description: character.description,
+                style: gameState.imageSettings.lastStyle || 'realistic',
+                colorTone: gameState.imageSettings.lastColorTone || 'warm'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`角色立绘生成失败，状态码: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.imageUrl) {
+            throw new Error('响应缺少 imageUrl');
+        }
+
+        console.log(`角色 ${character.name} 立绘生成成功: ${data.imageUrl}`);
+        imageElement.src = data.imageUrl;
+        imageElement.onload = () => console.log(`角色 ${character.name} 图片加载成功`);
+        imageElement.onerror = () => {
+            console.error(`角色 ${character.name} 图片加载失败: ${data.imageUrl}`);
+            imageElement.src = 'test.png';
+        };
+    } catch (error) {
+        console.error(`生成角色 ${character.name} 立绘失败:`, error);
+        imageElement.src = 'test.png';
+    }
+}
 
 // 在文档加载完成后初始化游戏
 document.addEventListener('DOMContentLoaded', async () => {
     // 1. 获取创作设定
-    const settingsStr = localStorage.getItem('gameSettings');
+    const settingsStr = localStorage.getItem('creatorsettings');
     const settingInfoDiv = document.getElementById('create-text-step-2');
 
     if (!settingsStr) {
@@ -2200,80 +1688,272 @@ document.addEventListener('DOMContentLoaded', async () => {
         initializeStoryInfoButtons();
     });
 
-    // 渲染章节标题到左侧树
-    function renderChapterTitles(chapters) {
+   // 渲染章节标题到左侧树
+
+   
+
+
+   //============================================================================================================
+//     function renderChapterTitles(chapters) {
 
         
-        const treeContainer = document.getElementById('storyTree');
-        treeContainer.innerHTML = ''; // 清空现有内容
+//         const treeContainer = document.getElementById('storyTree');
+//         treeContainer.innerHTML = ''; // 清空现有内容
         
-        chapters.forEach(chapter => {
-            const nodeElement = document.createElement('div');
-            nodeElement.className = 'tree-node';
+//         chapters.forEach(chapter => {
+//             const nodeElement = document.createElement('div');
+//             nodeElement.className = 'tree-node';
             
-            // 创建标题元素
-            const titleElement = document.createElement('div');
-            titleElement.className = 'tree-node-title';
-            titleElement.textContent = `第${chapter.id}章：${chapter.title}`;
-            titleElement.dataset.id = chapter.id;
+//             // 创建标题元素
+//             const titleElement = document.createElement('div');
+//             titleElement.className = 'tree-node-title';
+//             titleElement.textContent = `第${chapter.id}章：${chapter.title}`;
+//             titleElement.dataset.id = chapter.id;
             
-            // 创建生成按钮
-            const generateBtn = document.createElement('button');
-            generateBtn.className = 'tree-node-generate';
-            generateBtn.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
-            generateBtn.title = '生成该章节的详细内容';
+//             // 创建生成按钮
+//             const generateBtn = document.createElement('button');
+//             generateBtn.className = 'tree-node-generate';
+//             generateBtn.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
+//             generateBtn.title = '生成该章节的详细内容';
             
-            // 如果章节内容已生成，修改按钮外观
-            if (chapter.generated) {
-                generateBtn.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
-                generateBtn.classList.add('generated');
-            }
+//             // 如果章节内容已生成，修改按钮外观
+//             if (chapter.generated) {
+//                 generateBtn.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
+//                 generateBtn.classList.add('generated');
+//             }
             
-            // 组装节点
-            nodeElement.appendChild(titleElement);
-            nodeElement.appendChild(generateBtn);
-            treeContainer.appendChild(nodeElement);
+//             // 组装节点
+//             nodeElement.appendChild(titleElement);
+//             nodeElement.appendChild(generateBtn);
+//             treeContainer.appendChild(nodeElement);
             
-            // 添加点击事件 - 选择章节
-            titleElement.addEventListener('click', function() {
-                const chapterId = parseInt(this.dataset.id);
-                const chapter = gameState.storyTree.find(c => c.id === chapterId);
-                if (chapter) {
-                    selectChapter(chapter);
-                }
-            });
+//             // 添加点击事件 - 选择章节
+//             titleElement.addEventListener('click', function() {
+//                 const chapterId = parseInt(this.dataset.id);
+//                 const chapter = gameState.storyTree.find(c => c.id === chapterId);
+//                 if (chapter) {
+//                     selectChapter(chapter);
+//                 }
+//             });
             
-            // 添加生成按钮点击事件
-            generateBtn.addEventListener('click', async function(e) {
-                e.stopPropagation(); // 防止触发标题选择
+//             // 添加生成按钮点击事件
+//             generateBtn.addEventListener('click', async function(e) {
+//                 e.stopPropagation(); // 防止触发标题选择
 
 
-                console.log("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
+//                 console.log("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb");
                 
-                const chapterId = parseInt(titleElement.dataset.id);
-                const chapter = gameState.storyTree.find(c => c.id === chapterId);
+//                 const chapterId = parseInt(titleElement.dataset.id);
+//                 const chapter = gameState.storyTree.find(c => c.id === chapterId);
                 
-                if (!chapter) return;
+//                 if (!chapter) return;
                 
-                // 显示生成中提示
-                this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
-                this.disabled = true;
+//                 // 显示生成中提示
+//                 this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+//                 this.disabled = true;
                 
-                try {
-                    // 调用API生成章节内容
-                    const content = await generateChapterContent(chapterId);
+//                 try {
+//                     // 调用API生成章节内容
+//                     const content = await generateChapterContent(chapterId);
                     
+//                     // 更新章节数据
+//                     chapter.content = content;
+//                     chapter.generated = true;
+                    
+//                     // 保存到本地存储
+//                     saveGameState();
+                    
+//                     // 更新UI
+//                     if (currentStoryNode && currentStoryNode.id === chapterId) {
+//                         document.getElementById('storyText').textContent = content;
+//                     }
+                    
+//                     // 修改按钮外观
+//                     this.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
+//                     this.classList.add('generated');
+//                     this.disabled = false;
+                    
+//                     addToHistory({
+//                         title: "生成内容",
+//                         content: `为"第${chapterId}章：${chapter.title}"生成了详细内容`
+//                     });
+                    
+//                 } catch (error) {
+//                     console.error('生成章节内容失败1113333331:', error);
+//                     alert('生成章节内容失败222: ' + error.message);
+                    
+//                     // 恢复按钮状态
+//                     this.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
+//                     this.disabled = false;
+//                 }
+//             });
+//         });
+//     }
+
+//     // 选择章节
+//     function selectChapter(chapter) {
+//         currentStoryNode = chapter;
+        
+//         // 更新显示
+//         document.getElementById('currentStageTitle').textContent = chapter.title;
+//         document.getElementById('storyText').textContent = chapter.content || '点击左侧按钮生成此章节内容...';
+//         document.getElementById('storyText').dataset.nodeId = chapter.id;
+//         document.getElementById('currentChapter').textContent = chapter.title;
+        
+//         // 高亮当前节点
+//         document.querySelectorAll('.tree-node').forEach(node => {
+//             node.classList.remove('active');
+//         });
+        
+//         const activeNode = document.querySelector(`.tree-node-title[data-id="${chapter.id}"]`);
+//         if (activeNode) {
+//             activeNode.parentElement.classList.add('active');
+//         }
+        
+//         // 生成新的场景图片（如果有内容）
+//         if (chapter.content) {
+//             regenerateImage(chapter.content);
+//         } else {
+//             document.getElementById('storyImage').src = 'test.png';
+//         }
+        
+//         // 保存当前章节
+//         saveGameState();
+//     }
+
+//     // 生成章节内容
+//     async function generateChapterContent(chapterId) {
+//     // 获取故事背景和角色信息
+//     const settingsStr = localStorage.getItem('creatorsettings');
+//     if (!settingsStr) {
+//         throw new Error('未找到创作设定');
+//     }
+//     const settings = JSON.parse(settingsStr);
+    
+//     // 获取当前章节
+//     const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
+//     if (!currentChapter) {
+//         throw new Error('未找到指定章节');
+//     }
+    
+//     // 收集前面章节的内容（严格匹配后端 ChapterInfo 模型）
+//     const previousChapters1 = gameState.storyTree
+//         .filter(c => c.id < chapterId) // 包含所有前置章节（即使内容为空，后端允许空字符串）
+//         .map(c => ({
+//             id: c.id, // 必须包含id（后端 ChapterInfo 模型要求）
+//             title: c.title || `第${c.id}章`, // 确保标题存在，避免空值
+//             content: c.content || '' // 内容允许为空，但必须有此字段
+//         }));
+    
+//     // 构建请求参数（严格匹配后端 SpecificChapterRequest 模型）
+//     const payload1 = {
+//         background: settings.background || '', // 确保不为undefined
+//         characters: settings.characters || [], // 确保是数组（后端要求至少包含一个角色）
+//         complexity: settings.complexity || "medium", // 匹配后端默认值
+//         chapterNumber: chapterId, // 必须是整数（与后端 int 类型匹配）
+//         chapterCount: gameState.storyTree.length, // 必须是整数
+//         currentChapterTitle: currentChapter.title || `第${chapterId}章`, // 确保标题不为空
+//         previousChapters: previousChapters1 // 严格匹配 ChapterInfo 模型结构
+//     };
+
+//     try {
+//         // 调用API生成章节内容
+//         const response = await fetch("http://localhost:8000/api/generate-specific-chapter", {
+//             method: 'POST',
+//             headers: { 
+//                 'Content-Type': 'application/json',
+//             },
+//             body: JSON.stringify(payload1)
+//         });
+        
+//         if (!response.ok) {
+//             // 解析后端返回的详细错误信息
+//             const errorData = await response.json();
+//             throw new Error(`生成失败：${errorData.detail || '服务器错误'}`);
+//         }
+        
+//         const data = await response.json();
+//         return data.content;
+        
+//     } catch (error) {
+//         console.error(`调用generate-specific-chapter失败：`, error);
+//         throw error; // 重新抛出错误，供上层处理
+//     }
+// }
+
+
+
+
+//===========================================================================================================================================
+
+
+function renderChapterTitles(chapters) {
+    const treeContainer = document.getElementById('storyTree');
+    treeContainer.innerHTML = ''; // 清空现有内容
+    
+    chapters.forEach(chapter => {
+        const nodeElement = document.createElement('div');
+        nodeElement.className = 'tree-node';
+        
+        // 创建标题元素
+        const titleElement = document.createElement('div');
+        titleElement.className = 'tree-node-title';
+        titleElement.textContent = `第${chapter.id}章：${chapter.title}`;
+        titleElement.dataset.id = chapter.id;
+        
+        // 创建生成按钮
+        const generateBtn = document.createElement('button');
+        generateBtn.className = 'tree-node-generate';
+        generateBtn.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
+        generateBtn.title = '生成该章节的详细内容';
+        
+        // 如果章节内容已生成，修改按钮外观
+        if (chapter.generated) {
+            generateBtn.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
+            generateBtn.classList.add('generated');
+        }
+        
+        // 组装节点
+        nodeElement.appendChild(titleElement);
+        nodeElement.appendChild(generateBtn);
+        treeContainer.appendChild(nodeElement);
+        
+        // 添加点击事件 - 选择章节
+        titleElement.addEventListener('click', function() {
+            const chapterId = parseInt(this.dataset.id);
+            const chapter = gameState.storyTree.find(c => c.id === chapterId);
+            if (chapter) {
+                selectChapter(chapter);
+            }
+        });
+        
+        // 添加生成按钮点击事件
+        generateBtn.addEventListener('click', function(e) {
+            e.stopPropagation(); // 防止触发标题选择
+            
+            const chapterId = parseInt(titleElement.dataset.id);
+            const chapter = gameState.storyTree.find(c => c.id === chapterId);
+            
+            if (!chapter) return;
+            
+            // 显示生成中提示
+            this.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 生成中...';
+            this.disabled = true;
+            
+            // 清空当前内容并显示生成提示
+            const storyTextElement = document.getElementById('storyText');
+            storyTextElement.textContent = '正在生成内容...';
+            storyTextElement.dataset.generating = 'true';
+            
+            // 调用流式API生成章节内容
+            generateChapterContentStream(chapterId)
+                .then(content => {
                     // 更新章节数据
                     chapter.content = content;
                     chapter.generated = true;
                     
                     // 保存到本地存储
                     saveGameState();
-                    
-                    // 更新UI
-                    if (currentStoryNode && currentStoryNode.id === chapterId) {
-                        document.getElementById('storyText').textContent = content;
-                    }
                     
                     // 修改按钮外观
                     this.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
@@ -2284,109 +1964,175 @@ document.addEventListener('DOMContentLoaded', async () => {
                         title: "生成内容",
                         content: `为"第${chapterId}章：${chapter.title}"生成了详细内容`
                     });
-                    
-                } catch (error) {
-                    console.error('生成章节内容失败1113333331:', error);
-                    alert('生成章节内容失败222: ' + error.message);
+                })
+                .catch(error => {
+                    console.error('生成章节内容失败:', error);
+                    alert('生成章节内容失败: ' + error.message);
                     
                     // 恢复按钮状态
                     this.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
                     this.disabled = false;
-                }
-            });
+                    
+                    // 恢复内容显示
+                    storyTextElement.textContent = chapter.content || '点击左侧按钮生成此章节内容...';
+                    delete storyTextElement.dataset.generating;
+                });
         });
-    }
+    });
+}
 
-    // 选择章节
-    function selectChapter(chapter) {
-        currentStoryNode = chapter;
+// 选择章节
+function selectChapter(chapter) {
+    currentStoryNode = chapter;
+    
+    // 更新显示
+    document.getElementById('currentStageTitle').textContent = chapter.title;
+    document.getElementById('storyText').textContent = chapter.content || '点击左侧按钮生成此章节内容...';
+    document.getElementById('storyText').dataset.nodeId = chapter.id;
+    document.getElementById('currentChapter').textContent = chapter.title;
+    
+    // 高亮当前节点
+    document.querySelectorAll('.tree-node').forEach(node => {
+        node.classList.remove('active');
+    });
+    
+    const activeNode = document.querySelector(`.tree-node-title[data-id="${chapter.id}"]`);
+    if (activeNode) {
+        activeNode.parentElement.classList.add('active');
+    }
+    
+    // 生成新的场景图片（如果有内容）
+    if (chapter.content) {
+        regenerateImage(chapter.content);
+    } else {
+        document.getElementById('storyImage').src = 'test.png';
+    }
+    
+    // 保存当前章节
+    saveGameState();
+}
+
+// 流式生成章节内容
+// 流式生成章节内容（修改后）
+// 修改 generateChapterContentStream 函数，重点处理JSON解析和内容流式显示
+async function generateChapterContentStream(chapterId) {
+    console.log("开始流式生成章节内容");
+    return new Promise((resolve, reject) => {
+        // 获取故事背景和角色信息
+        const settingsStr = localStorage.getItem('creatorsettings');
+        if (!settingsStr) {
+            reject(new Error('未找到创作设定'));
+            return;
+        }
+        const settings = JSON.parse(settingsStr);
         
-        // 更新显示
-        document.getElementById('currentStageTitle').textContent = chapter.title;
-        document.getElementById('storyText').textContent = chapter.content || '点击左侧按钮生成此章节内容...';
-        document.getElementById('storyText').dataset.nodeId = chapter.id;
-        document.getElementById('currentChapter').textContent = chapter.title;
-        
-        // 高亮当前节点
-        document.querySelectorAll('.tree-node').forEach(node => {
-            node.classList.remove('active');
-        });
-        
-        const activeNode = document.querySelector(`.tree-node-title[data-id="${chapter.id}"]`);
-        if (activeNode) {
-            activeNode.parentElement.classList.add('active');
+        // 获取当前章节
+        const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
+        if (!currentChapter) {
+            reject(new Error('未找到指定章节'));
+            return;
         }
         
-        // 生成新的场景图片（如果有内容）
-        if (chapter.content) {
-            regenerateImage(chapter.content);
-        } else {
-            document.getElementById('storyImage').src = 'test.png';
-        }
+        // 构建请求参数
+        const previousChapters = gameState.storyTree
+            .filter(c => c.id < chapterId)
+            .map(c => ({
+                id: c.id,
+                title: c.title || `第${c.id}章`,
+                content: c.content || ''
+            }));
         
-        // 保存当前章节
-        saveGameState();
-    }
+        const payload = {
+            background: settings.background || '',
+            characters: settings.characters || [],
+            complexity: settings.complexity || "medium",
+            chapterNumber: chapterId,
+            currentChapterTitle: currentChapter.title || `第${chapterId}章`,
+            currentChapterContent: currentChapter.content || '',
+            chapterCount: gameState.storyTree.length,
+            currentInput: '',  // 按需传递
+            previousChapters: previousChapters
+        };
 
-    // 生成章节内容
-    async function generateChapterContent(chapterId) {
-    // 获取故事背景和角色信息
-    const settingsStr = localStorage.getItem('gameSettings');
-    if (!settingsStr) {
-        throw new Error('未找到创作设定');
-    }
-    const settings = JSON.parse(settingsStr);
-    
-    // 获取当前章节
-    const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
-    if (!currentChapter) {
-        throw new Error('未找到指定章节');
-    }
-    
-    // 收集前面章节的内容（严格匹配后端 ChapterInfo 模型）
-    const previousChapters1 = gameState.storyTree
-        .filter(c => c.id < chapterId) // 包含所有前置章节（即使内容为空，后端允许空字符串）
-        .map(c => ({
-            id: c.id, // 必须包含id（后端 ChapterInfo 模型要求）
-            title: c.title || `第${c.id}章`, // 确保标题存在，避免空值
-            content: c.content || '' // 内容允许为空，但必须有此字段
-        }));
-    
-    // 构建请求参数（严格匹配后端 SpecificChapterRequest 模型）
-    const payload1 = {
-        background: settings.background || '', // 确保不为undefined
-        characters: settings.characters || [], // 确保是数组（后端要求至少包含一个角色）
-        complexity: settings.complexity || "medium", // 匹配后端默认值
-        chapterNumber: chapterId, // 必须是整数（与后端 int 类型匹配）
-        chapterCount: gameState.storyTree.length, // 必须是整数
-        currentChapterTitle: currentChapter.title || `第${chapterId}章`, // 确保标题不为空
-        previousChapters: previousChapters1 // 严格匹配 ChapterInfo 模型结构
-    };
-
-    try {
-        // 调用API生成章节内容
-        const response = await fetch("http://localhost:8000/api/generate-specific-chapter", {
+        // 发送请求到新接口（generate-specific-chapter1）
+        fetch("http://localhost:8000/api/generate-specific-chapter1", {
             method: 'POST',
-            headers: { 
+            headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(payload1)
+            body: JSON.stringify(payload),
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP错误: ${response.status}`);
+            }
+            if (!response.body) {
+                throw new Error('服务器不支持流式响应');
+            }
+
+            // 初始化页面元素和变量
+            const storyTextElement = document.getElementById('storyText');
+            storyTextElement.textContent = '';  // 清空内容
+            storyTextElement.dataset.generating = 'true';
+            
+            const decoder = new TextDecoder();
+            const reader = response.body.getReader();
+            let fullContent = '';  // 用于拼接完整内容
+
+            // 处理流式数据的函数
+            const processStream = async () => {
+                const { done, value } = await reader.read();
+                if (done) {
+                    // 流结束后清理状态
+                    storyTextElement.dataset.generating = 'false';
+                    resolve(fullContent);  // 返回完整内容
+                    return;
+                }
+
+                // 解码当前片段并处理
+                const chunk = decoder.decode(value, { stream: true });
+                // SSE格式的每条数据以"data: "开头，需提取内容
+                const dataLines = chunk.split('\n')
+                    .filter(line => line.startsWith('data: '))
+                    .map(line => line.replace('data: ', '').trim());
+
+                // 遍历每条数据并追加到页面
+                dataLines.forEach(data => {
+                    if (data === '[END]') {
+                        // 结束标记，不追加内容
+                        return;
+                    } else if (data.startsWith('[ERROR]')) {
+                        // 错误处理
+                        reject(new Error(data.replace('[ERROR]', '').trim()));
+                        return;
+                    }
+                    // 实时追加内容到页面
+                    storyTextElement.textContent += data;
+                    fullContent += data;  // 拼接完整内容
+                    // 自动滚动到底部
+                    storyTextElement.scrollTop = storyTextElement.scrollHeight;
+                });
+
+                // 继续处理下一个片段
+                processStream();
+            };
+
+            // 开始处理流
+            processStream();
+        })
+        .catch(error => {
+            console.error('流式请求失败:', error);
+            const storyTextElement = document.getElementById('storyText');
+            storyTextElement.textContent = '生成失败，请重试';
+            storyTextElement.dataset.generating = 'false';
+            reject(new Error('生成内容失败: ' + error.message));
         });
-        
-        if (!response.ok) {
-            // 解析后端返回的详细错误信息
-            const errorData = await response.json();
-            throw new Error(`生成失败：${errorData.detail || '服务器错误'}`);
-        }
-        
-        const data = await response.json();
-        return data.content;
-        
-    } catch (error) {
-        console.error(`调用generate-specific-chapter失败：`, error);
-        throw error; // 重新抛出错误，供上层处理
-    }
+    });
 }
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////=================
+
+
 
 
 
@@ -2557,12 +2303,15 @@ function initializeTitleEditing() {
 }
 // 等待DOM加载完成
 document.addEventListener('DOMContentLoaded', function() {
+
+
     // 获取元素引用
     const oldEditTitleBtn = document.querySelector('.tree-controls .edit-title-btn');
     const newEditTitleBtn = oldEditTitleBtn.cloneNode(true);
     oldEditTitleBtn.parentNode.replaceChild(newEditTitleBtn, oldEditTitleBtn);
-    initializeTitleEditing();
     
+    initializeTitleEditing();
+   
     // 初始化模态框处理
     initializeModalHandlers();
     const editTitleBtn = document.querySelector('.tree-controls .edit-title-btn');
@@ -2575,6 +2324,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveModalBtn = document.querySelector('.save-modal-btn');
     const cancelModalBtn = document.querySelectorAll('.cancel-modal-btn');
     const closeModalBtn = document.querySelectorAll('.close-modal');
+
     
     // 当前编辑目标
     let currentEditTarget = null;
