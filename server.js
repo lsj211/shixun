@@ -123,11 +123,13 @@ app.post('/api/login', async (req, res) => {
         if (!isPasswordValid) {
             return res.status(401).json({ message: '认证失败' });
         }
-        const token = jwt.sign(
-            { userId: user.id, username: user.username },
-            '123', // 生产环境请用更安全的密钥
-            { expiresIn: '1h' }
-        );
+        // const token = jwt.sign(
+        //     { userId: user.id, username: user.username },
+        //     '123', // 生产环境请用更安全的密钥
+        //     { expiresIn: '1h' }
+        // );
+        const token = 
+        { userId: user.id, username: user.username };
         res.json({ token });
     } catch (error) {
         console.error(error);

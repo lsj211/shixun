@@ -1,4 +1,74 @@
 document.addEventListener('DOMContentLoaded', () => {
+
+    const steps = document.querySelectorAll('.setting-step');
+    const nextButtons = document.querySelectorAll('.next-btn');
+    const prevButtons = document.querySelectorAll('.prev-btn');
+    const progressContainer = document.querySelector('.progress-container');
+    const progressSteps = document.querySelectorAll('.progress-step');
+    
+    // 更新进度条状态
+    function updateProgress(currentStep) {
+        // 重置所有状态
+        progressSteps.forEach(step => {
+            step.classList.remove('completed', 'active');
+        });
+        
+        // 设置已完成步骤
+        for (let i = 0; i < currentStep - 1; i++) {
+            if (progressSteps[i]) {
+                progressSteps[i].classList.add('completed');
+            }
+        }
+        
+        // 设置当前步骤
+        if (progressSteps[currentStep - 1]) {
+            progressSteps[currentStep - 1].classList.add('active');
+        }
+        
+        // 更新连接线状态
+        progressContainer.className = 'progress-container';
+        if (currentStep > 1) {
+            progressContainer.classList.add(`completed-step-${currentStep - 1}`);
+        }
+    }
+    
+    // 显示指定步骤
+    function showStep(stepIndex) {
+        steps.forEach((step, index) => {
+            if (index === stepIndex) {
+                step.classList.remove('hidden');
+            } else {
+                step.classList.add('hidden');
+            }
+        });
+        updateProgress(stepIndex + 1); // 步骤索引从0开始，进度从1开始
+    }
+    
+    // 下一步按钮事件
+    nextButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            if (currentStep < steps.length) {
+                showStep(currentStep);
+            }
+        });
+    });
+    
+    // 上一步按钮事件
+    prevButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            if (currentStep > 1) {
+                showStep(currentStep - 2);
+            }
+        });
+    });
+    
+    // 初始化显示第一步
+    showStep(0);
+
+
+
         // 模式选择按钮
         const playModeBtn = document.getElementById('play-mode-btn');
         const createModeBtn = document.getElementById('create-mode-btn');
@@ -33,7 +103,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 渲染存档列表，按模式区分key
         function renderArchiveList() {
-            let keyName = currentMode === 'game' ? 'gameSettings_keys' : 'creatorSettings_keys';
+            const userId = JSON.parse(localStorage.getItem('token')).userId;
+            let keyName = currentMode === 'game' ? `gameSettings_keys_${userId}` : 'creatorSettings_keys';
             const allKeys = JSON.parse(localStorage.getItem(keyName) || '[]');
             archiveSelect.innerHTML = '';
             if (allKeys.length > 0) {
@@ -69,7 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             allKeys = allKeys.filter(k => k !== selectedKey);
                             localStorage.setItem(keyName, JSON.stringify(allKeys));
                             // 如果当前存档被删，清除current
-                            const currentKey = currentMode === 'game' ? 'gameSettings_current' : 'creatorSettings_current';
+                            const currentKey = currentMode === 'game' ? `gameSettings_current_${userId}`: 'creatorSettings_current';
                             if (localStorage.getItem(currentKey) === selectedKey) {
                                 localStorage.removeItem(currentKey);
                             }
@@ -99,8 +170,9 @@ document.addEventListener('DOMContentLoaded', () => {
             const selectedKey = archiveSelect.value;
             if (selectedKey) {
                 if (currentMode === 'game') {
-                    localStorage.setItem('gameSettings_current', selectedKey);
-                    window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
+                    localStorage.setItem(`gameSettings_current_${userId}`, selectedKey);
+                    window.location.href = `game.html?userId=${userId}&archive=${encodeURIComponent(selectedKey)}`;
+                    // window.location.href = 'game.html?archive=' + encodeURIComponent(selectedKey);
                 } else if (currentMode === 'create') {
                     localStorage.setItem('creatorSettings_current', selectedKey);
                     window.location.href = 'create.html?archive=' + encodeURIComponent(selectedKey);
@@ -228,6 +300,19 @@ document.addEventListener('DOMContentLoaded', () => {
             addCharacterInput(playCharactersContainer);
         });
 
+        // const userId = JSON.parse(localStorage.getItem('token')).userId;
+        const tokenStr = localStorage.getItem('token');
+        if (!tokenStr) {
+            throw new Error('未找到 token，请重新登录');
+        }
+        
+        const token = JSON.parse(tokenStr);
+        console.log('token:', token);
+        if (!token.userId) {
+            throw new Error('token 格式错误，缺少 userId');
+        }
+        
+        const userId = token.userId;
         // 开始游戏按钮逻辑
         const startGameBtn = document.querySelector('.start-game-btn');
         startGameBtn.addEventListener('click', () => {
@@ -235,19 +320,34 @@ document.addEventListener('DOMContentLoaded', () => {
             collectGameSettings();
 
             // 生成唯一key（如用时间戳）
-            const key = 'gameSettings_' + Date.now();
+            // const key = 'gameSettings_' + Date.now();
+            // localStorage.setItem(key, JSON.stringify(gameSettings));
+
+            // // 设置当前存档键
+            // localStorage.setItem('gameSettings_current', key); // 添加此行
+            
+            // // 可选：记录所有key，方便管理
+            // let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
+            // allKeys.push(key);
+            // localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+
+            // // 跳转到游戏页面
+            // window.location.href = 'game.html?archive=' + encodeURIComponent(key);
+
+            // 生成带用户ID前缀的唯一key
+            const key = `gameSettings_${userId}_${Date.now()}`;
             localStorage.setItem(key, JSON.stringify(gameSettings));
 
-            // 设置当前存档键
-            localStorage.setItem('gameSettings_current', key); // 添加此行
+            // 设置当前存档键（带用户ID）
+            localStorage.setItem(`gameSettings_current_${userId}`, key);
             
-            // 可选：记录所有key，方便管理
-            let allKeys = JSON.parse(localStorage.getItem('gameSettings_keys') || '[]');
-            allKeys.push(key);
-            localStorage.setItem('gameSettings_keys', JSON.stringify(allKeys));
+            // 只存储当前用户的存档键列表
+            let userKeys = JSON.parse(localStorage.getItem(`gameSettings_keys_${userId}`) || '[]');
+            userKeys.push(key);
+            localStorage.setItem(`gameSettings_keys_${userId}`, JSON.stringify(userKeys));
 
-            // 跳转到游戏页面
-            window.location.href = 'game.html?archive=' + encodeURIComponent(key);
+            // 跳转到游戏页面，携带用户ID和存档key
+            window.location.href = `game.html?userId=${userId}&archive=${encodeURIComponent(key)}`;
         });
     }
     
@@ -1099,13 +1199,15 @@ const createSteps = [
     // 如果有第一次进入，则自动生成更丰富的背景描述
     const backgroundInputs = document.querySelectorAll('#play-story-background, #create-story-background');
     backgroundInputs.forEach(input => {
+        input.dataset.firstGenerated = "false";
         input.addEventListener('blur', async function() {
             const text = this.value.trim();
-            if (text.length > 0) {
+            if (text.length > 0&& this.dataset.firstGenerated === "false") {
                 try {
                     const enhancedBackground = await generateEnhancedBackground(text);
                     if (enhancedBackground && confirm('我们生成了更详细的背景描述，是否替换当前内容？')) {
                         this.value = enhancedBackground;
+                        this.dataset.firstGenerated = "true"; // 标记为已生成
                     }
                 } catch (error) {
                     console.error('生成增强背景失败:', error);

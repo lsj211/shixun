@@ -37,6 +37,31 @@
         <!-- 游玩模式设定区 -->
         <section id="play-mode-settings" class="settings-panel hidden">
             <h2>游玩模式设定</h2>
+            <!-- 新增进度条 -->
+            <!-- 进度条 -->
+            <div class="progress-container">
+                <div class="progress-step completed active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-label">故事背景</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-label">角色设定</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span class="step-label">分支复杂度</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="4">
+                    <span class="step-number">4</span>
+                    <span class="step-label">章节数</span>
+                </div>
+            </div>
+
+
             <div class="setting-step" id="play-step-1">
                 <h3>步骤 1: 故事背景</h3>
                 <textarea id="play-story-background" placeholder="请输入故事背景..."></textarea>
@@ -89,6 +114,7 @@
                 </div>
             </div>
         </section>
+
 
         <!-- 创作模式设定区 -->
         <section id="create-mode-settings" class="settings-panel hidden">
