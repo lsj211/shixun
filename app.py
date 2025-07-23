@@ -360,7 +360,7 @@ async def generate_background(request: BackgroundGenerationRequest):
     # 步骤 3: 构建背景生成的系统模板，包含检索到的相关内容
     system_template = (
         f"作为一个专业的互动小说创作者，请基于以下简短描述，创建一个故事背景和世界观设定。\n\n"
-        f"相关背景内容: {relevant_content_text}\n\n"
+        f"相关背景内容: {relevant_content_text},参考我提供的相关内容生成，不要添加新的角色\n\n"
         "请严格遵守以下要求：\n"
         "1. 仅提供世界观相关内容，不要包含任何故事情节或剧情内容\n"
         "2. 世界观设定：限制在200字以内，仅描述故事发生的背景环境、社会结构、规则系统等\n"
@@ -793,6 +793,7 @@ async def generate_story_title(request: StoryTitleRequest):
         f"6. 小说的主题为{storytheme}\n\n"
         "返回格式：\n"
         "主标题 | 副标题(如果有)"
+        "严格按照此格式返回内容，不要有附带的信息"
     )
     
     human_template = (

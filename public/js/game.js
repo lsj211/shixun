@@ -129,13 +129,18 @@ function showGameCompleteMessage() {
     // 插入到选择按钮之前
     const choicesContainer = document.querySelector('.choices-container');
     choicesContainer.parentNode.insertBefore(gameCompleteDiv, choicesContainer);
-    
+    // 获取元素
+    const container = document.querySelector('.choices-container');
+    // 隐藏元素（不占据空间）
+    container.style.display = 'none';
     // 禁用生成新节点的功能
     disableNewBranches();
     
     // 添加重新开始按钮的点击事件
     gameCompleteDiv.querySelector('.restart-btn').addEventListener('click', () => {
         if (confirm('确定要重新开始游戏吗？当前进度将被重置。')) {
+            // document.querySelector('.choices-container').classList.add('disabled');
+            container.style.display = 'block'; // 恢复选择按钮容器显示  
             resetGame();
         }
     });
@@ -150,17 +155,18 @@ function disableNewBranches() {
 // 重置游戏
 function resetGame() {
     // 重置游戏状态
-    gameState.exploredNodes = new Set();
-    gameState.currentPath = [];
-    gameState.gameCompleted = false;
+    // gameState.exploredNodes = new Set();
+    // gameState.currentPath = [];
+    // gameState.gameCompleted = false;
     
-    // 恢复初始节点
-    currentStoryNode = storyContent.opening;
+    // // 恢复初始节点
+    // currentStoryNode = storyContent.opening;
     
-    // 记录初始节点已被探索
-    gameState.exploredNodes.add(currentStoryNode.id);
-    gameState.currentPath.push(currentStoryNode.id);
-    
+    // // 记录初始节点已被探索
+    // gameState.exploredNodes.add(currentStoryNode.id);
+    // gameState.currentPath.push(currentStoryNode.id);
+    // applyArchiveToGameState();
+    revertToNode(gameState.currentPath[0]);
     // 更新显示
     updateStoryDisplay(currentStoryNode);
     updateChoices(currentStoryNode.choices);
@@ -241,7 +247,9 @@ async function updateStoryDisplay(node) {
     // 更新标题
     document.getElementById('currentStageTitle').textContent = node.title;
     // 更新内容
-    document.getElementById('storyText').textContent = node.content;
+    // document.getElementById('storyText').textContent = node.content;
+    // 修正后：innerHTML 会解析 <br> 为换行
+    document.getElementById('storyText').innerHTML = node.content;
     // 更新章节信息
     document.getElementById('currentChapter').textContent = node.title;
     
@@ -340,41 +348,41 @@ async function handleChoiceClick(event) {
     document.getElementById('loadingIndicator').classList.remove('hidden');
     document.querySelector('.choices-container').classList.add('disabled');
 
-    // 如果游戏已完成，只允许使用已有分支
-    if (gameState.gameCompleted) {
-        // 查找现有分支
-        const parentNode = findNodeInStoryTree(currentStoryNode.id);
-        let existingChildForChoice = null;
+    // // 如果游戏已完成，只允许使用已有分支
+    // if (gameState.gameCompleted) {
+    //     // 查找现有分支
+    //     const parentNode = findNodeInStoryTree(currentStoryNode.id);
+    //     let existingChildForChoice = null;
         
-        if (parentNode && parentNode.children) {
-            existingChildForChoice = parentNode.children.find(child => {
-                return child.title.includes(currentChoice.text) || 
-                       child.content.includes(currentChoice.nextContent);
-            });
-        }
+    //     if (parentNode && parentNode.children) {
+    //         existingChildForChoice = parentNode.children.find(child => {
+    //             return child.title.includes(currentChoice.text) || 
+    //                    child.content.includes(currentChoice.nextContent);
+    //         });
+    //     }
         
-        if (existingChildForChoice) {
-            // 使用现有分支
-            currentStoryNode = existingChildForChoice;
-            updateStoryWithExistingNode(existingChildForChoice);
+    //     if (existingChildForChoice) {
+    //         // 使用现有分支
+    //         currentStoryNode = existingChildForChoice;
+    //         updateStoryWithExistingNode(existingChildForChoice);
             
-            // 隐藏加载状态
-            document.getElementById('loadingIndicator').classList.add('hidden');
-            document.querySelector('.choices-container').classList.remove('disabled');
+    //         // 隐藏加载状态
+    //         document.getElementById('loadingIndicator').classList.add('hidden');
+    //         document.querySelector('.choices-container').classList.remove('disabled');
             
-            // 更新进度条
-            updateChapterProgress();
-            return;
-        } else {
-            // 显示提示
-            alert('游戏已结束，只能探索现有的剧情分支。');
+    //         // 更新进度条
+    //         updateChapterProgress();
+    //         return;
+    //     } else {
+    //         // 显示提示
+    //         alert('游戏已结束，只能探索现有的剧情分支。');
             
-            // 隐藏加载状态
-            document.getElementById('loadingIndicator').classList.add('hidden');
-            document.querySelector('.choices-container').classList.remove('disabled');
-            return;
-        }
-    }
+    //         // 隐藏加载状态
+    //         document.getElementById('loadingIndicator').classList.add('hidden');
+    //         document.querySelector('.choices-container').classList.remove('disabled');
+    //         return;
+    //     }
+    // }
 
     // 检查是否是回溯后的选择
     if (gameState.lastRevertedNodeId) {
@@ -693,6 +701,13 @@ async function generateStoryEndingStreaming(currentChoice) {
                             let result;
                             try {
                                 result = JSON.parse(fullResponse);
+                                const text = result.content || fullResponse;
+                                // 方案一：<p> 段落
+                                const html = text
+                                    .split('\n\n')
+                                    .map(p => `<p>${p}</p>`)
+                                    .join('');
+                                contentContainer.innerHTML = html;
                             } catch (e) {
                                 console.warn('无法解析完整JSON:', e, 'fullResponse:', fullResponse);
                                 // 尝试提取JSON部分
@@ -722,7 +737,8 @@ async function generateStoryEndingStreaming(currentChoice) {
                             const storyEnding = {
                                 id: 'ending-' + Date.now(),
                                 title: result.title || `第${currentChapter}章 结局`,
-                                content: result.content || fullResponse,
+                                // content: result.content || fullResponse,
+                                content: html,
                                 choices: result.choices || [],
                                 parentId: currentStoryNode.id,
                                 chapter: currentChapter,
@@ -753,10 +769,34 @@ async function generateStoryEndingStreaming(currentChoice) {
                                     // 实时更新内容
                                     fullResponse += data.text;
                                     // 强制触发DOM更新
-                                    requestAnimationFrame(() => {
-                                        contentContainer.innerHTML = `<p>${fullResponse}</p>`;
-                                        contentContainer.scrollTop = contentContainer.scrollHeight;
-                                    });
+                                    // requestAnimationFrame(() => {
+                                    //     contentContainer.innerHTML = `<p>${fullResponse}</p>`;
+                                    //     contentContainer.scrollTop = contentContainer.scrollHeight;
+                                    // });
+                                    if (fullResponse.includes('"content": "')) {
+                                        // 找到 content 字段起始
+                                        const contentStartIndex = fullResponse.indexOf('"content": "') + 11;
+                                        
+                                        // 取出 content 后的全部内容（不再截断）
+                                        let contentSegment = fullResponse.substring(contentStartIndex);
+
+                                        // 清洗内容：还原转义字符、去掉残留引号
+                                        contentText = contentSegment
+                                            .replace(/\\"/g, '"')       // 转义引号恢复
+                                            .replace(/\\n\\n/g, '\n\n') // 恢复双换行
+                                            .replace(/\\n/g, '\n')      // 恢复单换行
+                                            .replace(/"/g, '');         // 去掉多余引号（内容中最后一个引号可能会遗留）
+
+                                        // 更新 DOM
+                                        requestAnimationFrame(() => {
+                                            const html = contentText
+                                                .split('\n\n')
+                                                .map(paragraph => `<p>${paragraph}</p>`)
+                                                .join('');
+                                            contentContainer.innerHTML = html;
+                                            contentContainer.scrollTop = contentContainer.scrollHeight;
+                                        });
+                                    }
                                 } catch (e) {
                                     console.warn('无法解析SSE数据:', dataStr, e);
                                     // 假设非JSON数据是文本内容，累积并显示
@@ -974,7 +1014,8 @@ async function generateNextContentFromAPI(choice) {
                             const nextStoryNode = {
                                 id: 'node-' + Date.now(),
                                 title: result.title || `第${requestData.chapterNumber}章 场景${requestData.sceneNumber}`,
-                                content: result.content || contentText,
+                                // content: result.content || contentText,
+                                content: contentText.replace(/\\n\\n/g, '<br>'), // 转换为换行
                                 choices: result.choices || generateSpecificChoices(result.content || contentText, extractKeywords(result.content || contentText)),
                                 parentId: currentStoryNode.id,
                                 chapter: nextChapter,
@@ -1727,11 +1768,12 @@ async function generateBackgroundContent() {
                                 case 'timeline':
                                     // 处理前情提要
                                     if (typeof data.text === 'string') {
-                                        if (data.text.includes('标题:') || data.text.includes('title:')) {
+                                        // console.log('处理时间线数据1:', data.text);
+                                        if (data.text.includes('名称:') || data.text.includes('title:')) {
                                             // 这是一个新事件的开始
-                                            const titleMatch = data.text.match(/(?:标题:|title:)\s*(.*?)(?:\n|$)/i);
-                                            const contentMatch = data.text.match(/(?:内容:|content:)\s*(.*?)(?:\n|$)/i);
-                                            
+                                            const titleMatch = data.text.match(/(?:名称:|title:)\s*(.*?)(?:\n|$)/i);
+                                            const contentMatch = data.text.match(/(?:描述:|content:)\s*(.*?)(?:\n|$)/i);
+                                            // console.log('处理时间线事件2:', data.text);
                                             if (titleMatch || contentMatch) {
                                                 timelineEvents.push({
                                                     title: titleMatch ? titleMatch[1].trim() : '事件',
@@ -1805,7 +1847,8 @@ async function generateBackgroundContent() {
             // 如果没有生成时间线事件，尝试从背景中提取关键事件
             timelineEvents = extractTimelineFromBackground(backgroundContent);
         }
-        
+        console.log('生成的时间线事件:', timelineEvents);
+        console.log('生成的地点列表:', locationsList);
         // 提取或生成地点列表
         if (locationsList.length === 0) {
             // 如果没有生成地点列表，尝试从背景中提取地点
@@ -1894,14 +1937,19 @@ function extractTimelineFromBackground(backgroundText) {
     
     // 提取前情提要
     while ((match = timelineRegex.exec(backgroundText)) !== null) {
+        console.log('提取到的前情提要:', match[1]);
         if (match[1] && match[1].trim()) {
             // 尝试从提取的内容中找出标题和描述
-            const titleMatch = match[1].match(/标题[:：]\s*(.*?)(?:\n|$)/i);
-            const contentMatch = match[1].match(/(?:内容|描述)[:：]\s*(.*?)(?:\n|$)/is);
-            
-            if (titleMatch && contentMatch) {
+            // const titleMatch = match[1].match(/标题[:：]\s*(.*?)(?:\n|$)/i);
+            // const contentMatch = match[1].match(/(?:内容|描述)[:：]\s*(.*?)(?:\n|$)/is);
+            // const titleMatch = match[1].match(/名称[:：]\s*(.*?)(?:\n|$)/i);
+            const titleMatch = match[1].match(/^([\s\S]*?)(?:\n|$)/);
+            const contentMatch = match[1].match(/描述[:：]\s*(.*?)(?:\n|$)/is);
+            console.log('标题匹配:', titleMatch, '内容匹配:', contentMatch);
+            if (contentMatch) {
                 timelineEvents.push({
                     title: titleMatch[1].trim(),
+                    // title:"hhh",
                     content: contentMatch[1].trim()
                 });
             } else {
@@ -1981,7 +2029,7 @@ function extractLocationsFromBackground(backgroundText) {
             // 尝试从提取的内容中找出名称和描述
             const nameMatch = match[1].match(/名称[:：]\s*(.*?)(?:\n|$)/i);
             const descMatch = match[1].match(/描述[:：]\s*(.*?)(?:\n|$)/is);
-            
+            console.log(nameMatch, descMatch);
             if (nameMatch && descMatch) {
                 locationsList.push({
                     name: nameMatch[1].trim(),
@@ -4434,7 +4482,8 @@ function loadGameFromArchive(archiveKey) {
             // 注意：不在这里设置currentStoryNode，而在loadSavedGame中处理
         }
         
-
+        const urlParams = new URLSearchParams(window.location.search);
+        const userId = urlParams.get('userId');
         // 设置为当前存档
         localStorage.setItem(`gameSettings_current_${userId}`, archiveKey);
         
@@ -4999,7 +5048,7 @@ document.addEventListener('DOMContentLoaded', () => {
     startGameArea.innerHTML = `
         <div class="start-game-container">
             <h2>准备开始你的冒险</h2>
-            <p>点击下方按钮，AI将根据你的设定生成完整的故事框架并开始游戏</p>
+            <p>请先创建详细故事背景及人物立绘</p>
             <button id="startGameBtn" class="start-game-btn">
                 <i class="fas fa-play"></i> 开始游戏
             </button>
