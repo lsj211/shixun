@@ -687,7 +687,7 @@ async function generateStoryEndingStreaming(currentChoice) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let fullResponse = '';
-
+        let chulicontentText = ''; // 用于存储处理后的内容文本
         return new Promise((resolve, reject) => {
             async function readStream() {
                 try {
@@ -708,6 +708,7 @@ async function generateStoryEndingStreaming(currentChoice) {
                                     .map(p => `<p>${p}</p>`)
                                     .join('');
                                 contentContainer.innerHTML = html;
+                                chulicontentText =html
                             } catch (e) {
                                 console.warn('无法解析完整JSON:', e, 'fullResponse:', fullResponse);
                                 // 尝试提取JSON部分
@@ -738,7 +739,7 @@ async function generateStoryEndingStreaming(currentChoice) {
                                 id: 'ending-' + Date.now(),
                                 title: result.title || `第${currentChapter}章 结局`,
                                 // content: result.content || fullResponse,
-                                content: html,
+                                content: chulicontentText,
                                 choices: result.choices || [],
                                 parentId: currentStoryNode.id,
                                 chapter: currentChapter,
@@ -1024,7 +1025,7 @@ async function generateNextContentFromAPI(choice) {
 
                             // 更新标题和选项区域
                             requestAnimationFrame(() => {
-                                titleContainer.textContent = nextStoryNode.title;
+                                // titleContainer.textContent = nextStoryNode.title;
                                 contentContainer.innerHTML = contentText.replace(/\\n\\n/g, '<br>'); // 转换为换行
                                 if (nextStoryNode.choices && nextStoryNode.choices.length > 0) {
                                     choicesContainer.innerHTML = nextStoryNode.choices.map((choice, index) => `
@@ -5129,7 +5130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
     }
 
-        titleElem.textContent = gameState?.storyOutline?.title ;
+    titleElem.textContent = gameState?.storyOutline?.title ;
     // 添加开始游戏按钮的点击事件
     document.getElementById('startGameBtn').addEventListener('click', startGame);
     

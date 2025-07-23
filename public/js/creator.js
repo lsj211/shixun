@@ -1,3 +1,4 @@
+
 let isRegenerating = false;
 // 游戏状态管理
 const gameState = {
@@ -225,7 +226,7 @@ function updateStoryDisplay(node) {
     document.getElementById('currentChapter').textContent = node.title;
     
     // 生成新的场景图片
-    regenerateImage(node.content);
+    // regenerateImage(node.content);
     
     // 将节点添加到剧情树
     addToStoryTree(node);
@@ -516,7 +517,7 @@ async function handleTitleChange(chapterId, newTitle) {
     showLoading(true, loadingMessage);
     
     try {
-        // 1. 更新当前章节标题
+        // 1. 获取当前章节标题
         const currentChapter = gameState.storyTree.find(c => c.id === chapterId);
         if (!currentChapter) {
             throw new Error(`未找到章节 ${chapterId}`);
@@ -540,15 +541,75 @@ async function handleTitleChange(chapterId, newTitle) {
         // 2. 重新生成当前章节内容
         showLoading(true, `${loadingMessage}\n正在重新生成当前章节内容...`);
         
-        const newContent = await regenerateChapterContent(currentChapter, true);
-        currentChapter.content = newContent;
+        // const newContent = await regenerateChapterContent(currentChapter, true);
+        // currentChapter.content = newContent;
+
+
+        generateChapterContentStream(chapterId)
+                .then(content => {
+                    // 更新章节数据
+                    currentChapter.content = content;
+                    currentChapter.generated = true;
+
+                    // 保存到本地存储
+                    saveGameState();
+                    
+                    // 修改按钮外观
+                    this.innerHTML = `<i class="fas fa-edit"></i> 重新生成`;
+                    // this.classList.add('generated');
+                    this.disabled = false;
+                    
+                    addToHistory({
+                        title: "生成内容",
+                        content: `为"第${chapterId}章：${currentChapter.title}"生成了详细内容`
+                    });
+
+                    console.log(currentChapter.content,"ajkbfchqwbhd qhwgkdjkbvhj qf")
+                    generateSceneImage(currentChapter.content, chapterId)
+                    .then(() => {
+                        // 更新历史记录
+                        addToHistory({
+                            title: "生成场景图像",
+                            content: `为第${chapterId}章生成了配图`
+                        });
+                        
+                        // 修改按钮外观
+                        this.innerHTML = `<i class="fas fa-refresh"></i> 重新生成`;
+                        //this.classList.add('generated');
+                        this.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('生成场景图像失败:', error);
+                        alert('生成场景图像失败: ' + error.message);
+                        
+                        // 恢复按钮状态
+                        this.innerHTML = `<i class="fas fa-image"></i> 生成图像`;
+                        this.disabled = false;
+                    });
+
+
+                    
+                })
+                        // .catch(error => {
+                        //     console.error('生成章节内容失败:', error);
+                        //     alert('生成章节内容失败: ' + error.message);
+                            
+                        //     // 恢复按钮状态
+                        //     this.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
+                        //     this.disabled = false;
+                            
+                        //     // 恢复内容显示
+                        //     storyTextElement.textContent = chapter.content || '点击左侧按钮生成此章节内容...';
+                        //     delete storyTextElement.dataset.generating;
+                        // });
+            
         
         // 更新UI
-        if (currentStoryNode.id === chapterId) {
-            document.getElementById('storyText').textContent = newContent;
-        }
-        
-        // 3. 重新生成后续章节
+        // if (currentStoryNode.id === chapterId) {
+        //     document.getElementById('storyText').textContent = newContent;
+        // }
+
+        //3. 重新生成后续章节
         const nextChapters = gameState.storyTree
             .filter(c => c.id > chapterId)
             .sort((a, b) => a.id - b.id); // 确保按顺序处理
@@ -557,28 +618,28 @@ async function handleTitleChange(chapterId, newTitle) {
                 // 重新生成整个章节（标题和内容）
                 const result = await regenerateChapter(currentChapter.id+1);
                 
-                // // 更新章节的标题和内容
-                // chapter.title = result.title;
-                // chapter.content = result.content;
-                
+                // 更新章节的标题和内容
+                // currentChapter.title = result.title;
+                // currentChapter.content = result.content;
+
                 // 更新左侧树中的标题
-                // const nextTreeTitle = document.querySelector(`.tree-node-title[data-id="${chapter.id}"]`);
-                // if (nextTreeTitle) {
-                //     nextTreeTitle.textContent = result.title;
-                // }
+                const nextTreeTitle = document.querySelector(`.tree-node-title[data-id="${currentChapter.id+1}"]`);
+                if (nextTreeTitle) {
+                    nextTreeTitle.textContent = `第${currentChapter.id + 1}章：` + result.title;
+                }
                 
-                // // 如果当前正在查看该章节，更新显示
-                // if (currentStoryNode.id === chapter.id) {
-                //     document.getElementById('currentStageTitle').textContent = result.title;
-                //     document.getElementById('currentChapter').textContent = result.title;
-                //     document.getElementById('storyText').textContent = result.content;
-                // }
+                // 如果当前正在查看该章节，更新显示
+                if (currentStoryNode.id === chapter.id) {
+                    // document.getElementById('currentStageTitle').textContent = result.title;
+                    // document.getElementById('currentChapter').textContent = result.title;
+                    document.getElementById('storyText').textContent = result.content;
+                }
                 
-                // // 添加历史记录
-                // addToHistory({
-                //     title: "连锁更新",
-                //     content: `章节 ${chapter.id} 已更新: ${result.title}`
-                // });
+                // 添加历史记录
+                addToHistory({
+                    title: "成功更新后续章节",
+                    content: `章节 ${currentChapter.id} 的后续章节已更新。`
+                });
             } catch (error) {
                 // console.error(`更新章节失败:`, error);
                 // addToHistory({
@@ -586,8 +647,11 @@ async function handleTitleChange(chapterId, newTitle) {
                 //     content: `章节更新失败: ${error.message}`
                 // });
             }
-        
-        
+        if (currentStoryNode.id === chapterId) {
+            document.getElementById('currentStageTitle').textContent = newTitle;
+            document.getElementById('currentChapter').textContent = newTitle;
+        }
+
         // 保存状态
         saveGameState();
         showToast("所有章节已成功更新！");
@@ -686,74 +750,6 @@ async function handleContentChange(chapterId) {
 
 
 
-
-// async function regenerateChapter(chapterId) {
-//     try {
-//         console.log(9999999999999999999999999999999999);
-//         // 获取故事背景和角色信息
-//         const settingsStr = localStorage.getItem('creatorsettings');
-//         if (!settingsStr) {
-//             throw new Error('未找到创作设定');
-//         }
-//         const settings = JSON.parse(settingsStr);
-        
-//         // 获取当前章节
-//         const chapter = gameState.storyTree.find(c => c.id === chapterId);
-//         if (!chapter) {
-//             throw new Error('未找到指定章节');
-//         }
-        
-//         // 收集前面章节的内容（包括最新修改）
-//         const previousChapters = gameState.storyTree
-//             .filter(c => c.id < chapterId)
-//             .map(c => ({
-//                 id: c.id,
-//                 title: c.title,
-//                 content: c.content
-//             }));
-        
-//         // 构建请求参数
-//         const payload = {
-//             background: settings.background,
-//             characters: settings.characters,
-//             complexity: settings.complexity || "medium",
-//             chapterNumber: chapterId,
-//             chapterCount: gameState.storyTree.length,
-//             previousChapters: previousChapters,
-//         };
-//         console.log("重新生成章节请求参数:", payload);
-
-//         // 调用API生成章节内容
-//         const response = await fetch("http://localhost:8000/api/generate-later-chapters", {
-//             method: 'POST',
-//             headers: { 
-//                 'Content-Type': 'application/json',
-//             },
-//             body: JSON.stringify(payload)
-//         });
-        
-//         if (!response.ok) {
-//             const errorData = await response.json();
-//             throw new Error(errorData.detail || '生成章节内容失败，请稍后重试');
-//         }
-        
-//         const data = await response.json();
-        
-//         // 确保返回的数据结构正确
-//         if (!data || typeof data !== 'object') {
-//             throw new Error('API返回无效数据');
-//         }
-        
-//         // 返回标题和内容
-//         return {
-//             title: data.title || `第${chapterId}章`,
-//             content: data.content || `这是第${chapterId}章的内容...`
-//         };
-//     } catch (error) {
-//         console.error(`重新生成章节 ${chapterId} 失败:`, error);
-//         throw error; // 重新抛出错误
-//     }
-// }
 
 
 
@@ -1298,7 +1294,7 @@ function initializeEditFeatures() {
     // });
 }
 
-// 初始化故事信息按钮
+/// 初始化故事信息按钮
 function initializeStoryInfoButtons() {
     // 故事背景按钮
     const storyInfoBtn = document.querySelector('.story-info-btn');
@@ -1325,77 +1321,327 @@ function initializeStoryInfoButtons() {
         });
     });
 }
-
-// 更新故事背景内容
 function updateStoryInfoContent() {
-    // 更新世界观设定
-    document.getElementById('worldBackground').textContent = gameState.storyBackground || "这是一个充满奇幻与神秘的世界，各种超自然现象时有发生...";
-
-    // 更新时间线
-    const timeline = document.getElementById('storyTimeline');
-    timeline.innerHTML = gameState.history.map(event => `
-        <div class="timeline-event">
-            <h4>${event.title}</h4>
-            <p>${event.content}</p>
-        </div>
-    `).join('');
-
-    // 更新重要地点
-    const locations = document.getElementById('importantLocations');
-    // 这里应该从游戏状态中获取地点信息
-    locations.innerHTML = [
-        {
-            name: "神秘房间",
-            description: "故事开始的地方，充满了未解之谜..."
-        },
-        {
-            name: "空旷街道",
-            description: "被雾气笼罩的街道，似乎隐藏着什么..."
-        },
-        {
-            name: "废弃工厂",
-            description: "传闻中发生过神秘事件的地方，弥漫着诡异的气息..."
-        }
-    ].map(location => `
-        <div class="location-card">
-            <h4>${location.name}</h4>
-            <p>${location.description}</p>
-        </div>
-    `).join('');
-}
-
-// 更新角色设定内容
-function updateCharacterInfoContent() {
-    const characterGrid = document.getElementById('characterGrid');
+    // 从gameState或localStorage恢复内容
+    const gameSettings = JSON.parse(localStorage.getItem('gameSettings')) || {};
     
-    // 如果没有角色数据，添加一些示例角色
-    if (gameState.characters.length === 0) {
-        gameState.characters = [
-            {
-                name: "主角",
-                description: "一位好奇心旺盛的年轻探险家，对神秘事件充满兴趣...",
-                traits: ["勇敢", "机智", "好奇心强"]
-            },
-            {
-                name: "神秘陌生人",
-                description: "在街道上遇到的神秘人物，似乎知道很多关于这个世界的秘密...",
-                traits: ["神秘", "沉默寡言", "观察力敏锐"]
-            }
-        ];
+    // 更新世界观设定 - 优先使用gameState中的内容，若没有则尝试从localStorage恢复
+    const worldBackgroundElement = document.getElementById('worldBackground');
+    let worldBackgroundContent = gameState.storyBackground;
+    
+    // 如果gameState中没有，尝试从localStorage获取
+    if (!worldBackgroundContent && gameSettings.generatedBackground) {
+        worldBackgroundContent = gameSettings.generatedBackground;
+        // 同时更新gameState
+        gameState.storyBackground = worldBackgroundContent;
     }
     
-    characterGrid.innerHTML = gameState.characters.map(char => `
-        <div class="character-info-card">
-            <img class="character-info-image" src="test.png" alt="${char.name}">
-            <div class="character-info-details">
-                <h3>${char.name}</h3>
-                <p>${char.description}</p>
-                <div class="character-traits">
-                    ${generateCharacterTraits(char)}
+    // 显示世界观内容，若无内容则显示提示文本
+    worldBackgroundElement.textContent = worldBackgroundContent || '暂无世界观设定内容';
+}
+function applyArchiveToGameState() {
+    const urlParams = new URLSearchParams(window.location.search);
+    
+    const archiveKey = "creatorsettings";
+    if (archiveKey) {
+        try {
+            console.log("archiveKey:    cc",archiveKey)
+            const gameSettings = JSON.parse(localStorage.getItem(archiveKey));
+            if (gameSettings) {
+                if (gameSettings.background) gameState.storyBackground = gameSettings.background;
+                if (Array.isArray(gameSettings.characters)) gameState.characters = gameSettings.characters;
+                if (gameSettings.complexity) gameState.settings.complexity = gameSettings.complexity;
+                if (gameSettings.chapterCount) gameState.settings.chapterCount = gameSettings.chapterCount;
+                if (gameSettings.title) gameState.title = gameSettings.title;
+                // 补充其他需要同步的字段（比如之前存档数据中的 meta、progress 等）
+                if (gameSettings.meta) {
+                    gameState.currentChapter = gameSettings.meta.currentChapter || gameState.currentChapter;
+                    gameState.gameCompleted = gameSettings.meta.gameCompleted || false;
+                }
+                if (gameSettings.gameProgress) {
+                    gameState.exploredNodes = new Set(gameSettings.gameProgress.exploredNodes || []);
+                    gameState.currentPath = gameSettings.gameProgress.currentPath || [];
+                    gameState.history = gameSettings.gameProgress.history || [];
+                    // 同步当前节点ID（如果需要）
+                    // currentStoryNode = currentStoryNode || { id: gameSettings.gameProgress.currentNodeId };
+                }
+                console.log('存档已成功应用到游戏状态');
+            }
+        } catch (e) {
+            console.warn('存档解析失败', e);
+        }
+    }
+}
+
+applyArchiveToGameState();
+// 更新故事背景内容
+async function updateCharacterInfoContent() {
+    const characterGrid = document.getElementById('characterGrid');
+    const container = document.querySelector('#characterInfoModal .modal-content');
+
+    // 添加AI生成按钮
+    if (!container.querySelector('.generate-characters-btn')) {
+        const generateButton = document.createElement('button');
+        generateButton.className = 'generate-characters-btn';
+        generateButton.innerHTML = '<i class="fas fa-magic"></i> AI生成角色立绘';
+        generateButton.style.backgroundColor = '#4CAF50';
+        generateButton.style.color = 'white';
+        generateButton.style.border = 'none';
+        generateButton.style.borderRadius = '4px';
+        generateButton.style.padding = '10px 15px';
+        generateButton.style.margin = '10px 0';
+        generateButton.style.cursor = 'pointer';
+        container.insertBefore(generateButton, container.firstChild);
+
+        generateButton.addEventListener('click', async () => {
+            await generateCharactersContent();
+        });
+    }
+    
+    
+    // 渲染角色卡片，id 后加索引
+    
+    characterGrid.innerHTML = gameState.characters.map((char, idx) => {
+        const safeId = getSafeId(char.name) + '_' + idx;
+        return `
+            <div class="character-info-card">
+                <img class="character-info-image" id="character-image-${safeId}" src="${char.imageUrl || 'test.png'}" alt="${char.name}">
+                <div class="character-info-details">
+                    <h3>${char.name}</h3>
+                    <p>${char.description}</p>
+                    <div class="character-traits">
+                        ${generateCharacterTraits(char)}
+                    </div>
                 </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
+
+    // 生成立绘时也用 safeId
+    for (let idx = 0; idx < gameState.characters.length; idx++) {
+        const char = gameState.characters[idx];
+        const safeId = getSafeId(char.name) + '_' + idx;
+        if (!char.imageUrl || char.imageUrl === 'test.png') {
+            generateCharacterImage(char, safeId);
+        }
+    }
+}
+
+async function generateCharactersContent() {
+    const characterGrid = document.getElementById('characterGrid');
+    console.log('开始生成角色内容，characterGrid存在:', !!characterGrid);
+    const originalContent = characterGrid.innerHTML;
+    
+    // 创建流式容器
+    const streamContainer = document.createElement('div');
+    streamContainer.className = 'stream-container';
+    streamContainer.style.position = 'relative';
+    streamContainer.style.backgroundColor = '#f9f9f9';
+    streamContainer.style.border = '1px solid #ddd';
+    streamContainer.style.borderRadius = '5px';
+    streamContainer.style.padding = '15px';
+    streamContainer.style.margin = '10px 0';
+    streamContainer.style.maxHeight = '300px';
+    streamContainer.style.overflowY = 'auto';
+
+    // 添加取消按钮
+    const cancelBtn = document.createElement('button');
+    cancelBtn.textContent = '取消生成';
+    cancelBtn.style.position = 'absolute';
+    cancelBtn.style.right = '10px';
+    cancelBtn.style.top = '10px';
+    cancelBtn.style.backgroundColor = '#ff4d4f';
+    cancelBtn.style.color = 'white';
+    cancelBtn.style.border = 'none';
+    cancelBtn.style.borderRadius = '4px';
+    cancelBtn.style.padding = '5px 10px';
+    cancelBtn.style.cursor = 'pointer';
+    streamContainer.appendChild(cancelBtn);
+
+    // 创建进度容器
+    const progressContainer = document.createElement('div');
+    progressContainer.className = 'progress-container';
+    streamContainer.appendChild(progressContainer);
+
+    // 替换原始内容
+    console.log('隐藏characterGrid，插入streamContainer');
+    characterGrid.style.display = 'none';
+    characterGrid.parentNode.insertBefore(streamContainer, characterGrid);
+
+    // 取消按钮事件
+    let cancelled = false;
+    cancelBtn.addEventListener('click', () => {
+        cancelled = true;
+        console.log('用户取消生成，恢复原始内容');
+        streamContainer.remove();
+        characterGrid.style.display = '';
+        characterGrid.innerHTML = originalContent;
+    });
+
+    try {
+        // 验证角色数据
+        console.log('验证角色数据，gameState.characters:', JSON.stringify(gameState.characters));
+        if (!gameState.characters || gameState.characters.length === 0) {
+            throw new Error('当前存档没有角色数据，请先设定角色。');
+        }
+
+        // 渲染角色卡片，初始使用占位图
+        console.log('渲染角色卡片，角色数量:', gameState.characters.length);
+        characterGrid.innerHTML = gameState.characters.map((char, idx) => {
+            const safeId = getSafeId(char.name) + '_' + idx;
+            return `
+                <div class="character-info-card">
+                    <img class="character-info-image" id="character-image-${safeId}" src="test.png" alt="${char.name}">
+                    <div class="character-info-details">
+                        <h3>${char.name}</h3>
+                        <p>${char.description}</p>
+                        <div class="character-traits">
+                            ${generateCharacterTraits(char)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        // 立即显示角色卡片
+        console.log('设置characterGrid显示');
+        characterGrid.style.display = '';
+        // 强制触发重绘
+        characterGrid.offsetHeight; // 触发浏览器重绘
+
+        // 为每个角色创建进度指示器
+        console.log('创建进度指示器');
+        progressContainer.innerHTML = gameState.characters.map(char => {
+            const safeId = getSafeId(char.name);
+            return `
+            <div class="character-progress" id="progress-${safeId}">
+                <span>正在为 ${char.name} 生成立绘...</span>
+                <div class="progress-bar" style="width: 0%; height: 5px; background: #4CAF50;"></div>
+            </div>
+            `;
+        }).join('');
+
+        // 逐个生成并实时填充立绘
+        for (let idx = 0; idx < gameState.characters.length; idx++) {
+            if (cancelled) break;
+            const character = gameState.characters[idx];
+            const safeId = getSafeId(character.name) + '_' + idx;
+
+            // 只显示当前角色的进度条
+            progressContainer.innerHTML = `
+                <div class="character-progress" id="progress-${safeId}">
+                    <span>正在为 ${character.name} 生成立绘...</span>
+                    <div class="progress-bar" style="width: 0%; height: 5px; background: #4CAF50;"></div>
+                </div>
+            `;
+
+            const progressBar = document.querySelector(`#progress-${safeId} .progress-bar`);
+            const imgElement = document.getElementById(`character-image-${safeId}`);
+
+            try {
+                // 模拟进度更新
+                for (let i = 0; i <= 100; i += 10) {
+                    if (cancelled) {
+                        console.log(`取消生成 ${character.name} 的立绘`);
+                        break;
+                    }
+                    progressBar.style.width = `${i}%`;
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                }
+
+                if (!cancelled) {
+                    console.log(`调用 generateCharacterImage 为 ${character.name}`);
+                    const startTime = performance.now();
+                    const imageUrl = await generateCharacterImage(character, safeId);
+                    const endTime = performance.now();
+                    console.log(`生成 ${character.name} 的立绘耗时: ${(endTime - startTime).toFixed(2)}ms, imageUrl:`, imageUrl);
+
+                    if (imgElement && imageUrl) {
+                        console.log(`更新 ${character.name} 的图像 src:`, imageUrl);
+                        imgElement.src = imageUrl;
+                        // 强制触发图像加载
+                        imgElement.onload = () => {
+                            console.log(`图像 ${character.name} 加载完成`);
+                        };
+                        imgElement.onerror = () => {
+                            console.error(`图像 ${character.name} 加载失败，回退到占位图`);
+                            imgElement.src = 'test.png';
+                        };
+                        // 触发重绘
+                        imgElement.offsetHeight;
+                    } else {
+                        console.warn(`无法更新图像: imgElement=${!!imgElement}, imageUrl=${!!imageUrl}`);
+                    }
+
+                    // 更新角色数据中的图像URL
+                    character.imageUrl = imageUrl;
+                    console.log(`更新 ${character.name} 的imageUrl:`, imageUrl);
+
+                    // 更新进度指示器
+                    const progressElement = document.getElementById(`progress-${character.name}`);
+                    if (progressElement) {
+                        progressElement.innerHTML = `<span>${character.name} 的立绘生成完成</span>`;
+                        progressElement.style.color = '#2ecc71';
+                        console.log(`更新 ${character.name} 的进度指示器为完成`);
+                    }
+                }
+            } catch (error) {
+                console.error(`为 ${character.name} 生成立绘失败:`, error.message, error.stack);
+                const progressElement = document.getElementById(`progress-${character.name}`);
+                if (progressElement) {
+                    progressElement.innerHTML = `<span>${character.name} 的立绘生成失败</span>`;
+                    progressElement.style.color = '#e74c3c';
+                }
+                if (imgElement) {
+                    imgElement.src = 'test.png';
+                    console.log(`为 ${character.name} 设置占位图`);
+                }
+            }
+
+            console.log(`完成 ${character.name} 的处理，等待500ms`);
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+
+        // 如果未取消，移除进度容器
+        if (!cancelled) {
+            console.log('所有立绘生成完成，移除进度容器');
+            streamContainer.remove();
+        }
+
+        // 保存到存档
+        // console.log('尝试保存到存档');
+        // const urlParams = new URLSearchParams(window.location.search);
+        // const userId = urlParams.get('userId');
+        // const archiveKey = urlParams.get('archive') || localStorage.getItem(`gameSettings_current_${userId}`);
+        // if (archiveKey) {
+        //     try {
+        //         const currentArchive = JSON.parse(localStorage.getItem(archiveKey)) || {};
+        //         currentArchive.characters = gameState.characters;
+        //         localStorage.setItem(archiveKey, JSON.stringify(currentArchive));
+        //         console.log('已将角色立绘保存到存档:', archiveKey);
+        //     } catch (e) {
+        //         console.error('保存角色到存档失败:', e.message, e.stack);
+        //     }
+        // } else {
+        //     console.warn('未找到存档key，无法保存');
+        // }
+    } catch (error) {
+        console.error('角色立绘生成总体失败:', error.message, error.stack);
+        progressContainer.textContent = '生成失败，请重试';
+        progressContainer.style.color = '#e74c3c';
+        setTimeout(() => {
+            if (!cancelled) {
+                console.log('生成失败，恢复原始内容');
+                characterGrid.style.display = '';
+                streamContainer.remove();
+                characterGrid.innerHTML = originalContent;
+            }
+        }, 3000);
+    }
+}
+// 更新角色设定内容
+function getSafeId(name) {
+    return name.replace(/\s+/g, '_').replace(/[^\w\-]/g, '');
 }
 
 // 生成角色特征标签
@@ -1463,22 +1709,114 @@ function editStoryContent() {
     };
 }
 
+////////////////////====================
+
+
+async function generateSceneImage(sceneContent, chapterId) {
+    const chapter = gameState.storyTree.find(c => c.id === chapterId);
+    if (!chapter) {
+        console.error(`未找到章节 ${chapterId}，无法绑定图片`);
+        return;
+    }
+
+    const storyImage = document.getElementById('storyImage');
+    if (!storyImage) {
+        console.error('未找到 storyImage 元素');
+        return;
+    }
+
+    try {
+        // 提取场景描述
+        let description = extractSceneDescription(sceneContent);
+
+        // 拼接角色信息（只取主要角色，或全部角色）
+        const characterDescriptions = gameState.characters.map(char => {
+            // 可选：只取有立绘的角色
+            return `${char.name}（${char.description}）`;
+        }).join('；');
+
+        // 将角色信息加入场景描述
+        if (characterDescriptions) {
+            description += `，画面中出现人物：${characterDescriptions}`;
+        }
+
+        console.log('发送图像生成请求:', {
+            description,
+            style: gameState.imageSettings.lastStyle || 'realistic',
+            colorTone: gameState.imageSettings.lastColorTone || 'warm'
+        });
+
+        const response = await fetch('/api/generate-image', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                description: description || '默认场景描述',
+                style: gameState.imageSettings.lastStyle || 'realistic',
+                colorTone: gameState.imageSettings.lastColorTone || 'warm'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`图像生成失败，状态码: ${response.status}`);
+        }
+
+        const data = await response.json();
+        if (!data.imageUrl) {
+            throw new Error('响应缺少 imageUrl');
+        }
+
+        console.log('收到图像 URL:', data.imageUrl);
+        chapter.image = data.imageUrl; // 绑定图片到章节
+        storyImage.src = data.imageUrl;
+
+        // 验证图片是否加载成功
+        storyImage.onload = () => console.log('图片加载成功:', data.imageUrl);
+        storyImage.onerror = () => {
+            console.error('图片加载失败:', data.imageUrl);
+            storyImage.src = 'test.png';
+        };
+    } catch (imageError) {
+        console.error('图像生成失败:', imageError);
+        storyImage.src = 'test.png';
+    }
+}
+
+
+function extractSceneDescription(sceneContent) {
+    // 简单实现：取前100个字符作为描述
+    let description = sceneContent;
+    
+    // 尝试找到描述场景的句子
+    const sceneSentencePatterns = [
+        /(.{10,100}[^.。!！?？]+场景[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+环境[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+地点[^.。!！?？]+[.。!！?？])/,
+        /(.{10,100}[^.。!！?？]+看到[^.。!！?？]+[.。!！?？])/
+    ];
+    
+    for (const pattern of sceneSentencePatterns) {
+        const match = sceneContent.match(pattern);
+        if (match && match[1]) {
+            description = match[1];
+            break;
+        }
+    }
+    
+    return description;
+}
+
+
+///////////////===============================
+
+
 // 图片生成相关初始化
 function initializeImageGeneration() {
-    const regenerateBtn = document.querySelector('.regenerate-image-btn');
+    
     const imageModal = document.getElementById('imageGenerateModal');
     
-    regenerateBtn.addEventListener('click', (e) => {
-        e.preventDefault();
-        
-        // 填充上次的设置
-        document.getElementById('sceneDescription').value = gameState.imageSettings.lastDescription;
-        document.getElementById('artStyle').value = gameState.imageSettings.lastStyle;
-        document.getElementById('colorTone').value = gameState.imageSettings.lastColorTone;
-        document.getElementById('additionalRequirements').value = gameState.imageSettings.lastRequirements;
-        
-        imageModal.classList.add('active');
-    });
+    
 
     // 设置生成按钮事件
     document.querySelector('.generate-image-btn').addEventListener('click', async () => {
@@ -1549,8 +1887,8 @@ async function generateImage(settings) {
     const height = 400;
     return `test.png`;
 }
-async function generateCharacterImage(character) {
-    const imageElement = document.getElementById(`character-image-${character.name}`);
+async function generateCharacterImage(character, safeId) {
+    const imageElement = document.getElementById(`character-image-${safeId}`);
     if (!imageElement) {
         console.error(`未找到角色 ${character.name} 的图片元素`);
         return;
@@ -1586,9 +1924,11 @@ async function generateCharacterImage(character) {
             console.error(`角色 ${character.name} 图片加载失败: ${data.imageUrl}`);
             imageElement.src = 'test.png';
         };
+        return data.imageUrl;
     } catch (error) {
         console.error(`生成角色 ${character.name} 立绘失败:`, error);
         imageElement.src = 'test.png';
+        return data.imageUrl;
     }
 }
 
@@ -1652,14 +1992,16 @@ document.addEventListener('DOMContentLoaded', async () => {
             console.log("章节标题生成成功", data);
             
             // 初始化章节数据，内容为空
-            const chapters = data.titles.map((title, index) => ({
-                id: index + 1,
-                title: title,
-                content: '',
-                editable: true,
-                generated: false,  // 标记章节内容是否已生成
-                choices: []
-            }));
+            // 初始化章节数据时添加image字段
+        const chapters = data.titles.map((title, index) => ({
+            id: index + 1,
+            title: title,
+            content: '',
+            editable: true,
+            generated: false,
+            image: '', // 新增：存储章节图片URL
+            choices: []
+        }));
             
             // 更新游戏状态
             gameState.storyTree = chapters;
@@ -1964,22 +2306,91 @@ function renderChapterTitles(chapters) {
                         title: "生成内容",
                         content: `为"第${chapterId}章：${chapter.title}"生成了详细内容`
                     });
-                })
-                .catch(error => {
-                    console.error('生成章节内容失败:', error);
-                    alert('生成章节内容失败: ' + error.message);
-                    
-                    // 恢复按钮状态
-                    this.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
-                    this.disabled = false;
-                    
-                    // 恢复内容显示
-                    storyTextElement.textContent = chapter.content || '点击左侧按钮生成此章节内容...';
-                    delete storyTextElement.dataset.generating;
-                });
+
+                    console.log(chapter.content,"ajkbfchqwbhd qhwgkdjkbvhj qf")
+                    generateSceneImage(chapter.content, chapterId)
+                    .then(() => {
+                        // 更新历史记录
+                        addToHistory({
+                            title: "生成场景图像",
+                            content: `为第${chapterId}章生成了配图`
+                        });     
+                        
+                        // 修改按钮外观
+                        this.innerHTML = `<i class="fas fa-refresh"></i> 重新生成`;
+                        this.classList.add('generated');
+                        this.disabled = false;
+                    })
+                    .catch(error => {
+                        console.error('生成场景图像失败:', error);
+                        alert('生成场景图像失败: ' + error.message);
+                        
+                        // 恢复按钮状态
+                        this.innerHTML = `<i class="fas fa-image"></i> 生成图像`;
+                        this.disabled = false;
+                    });
+
+
+                        })
+                        .catch(error => {
+                            console.error('生成章节内容失败:', error);
+                            alert('生成章节内容失败: ' + error.message);
+                            
+                            // 恢复按钮状态
+                            this.innerHTML = `<i class="fas fa-magic"></i> 生成内容`;
+                            this.disabled = false;
+                            
+                            // 恢复内容显示
+                            storyTextElement.textContent = chapter.content || '点击左侧按钮生成此章节内容...';
+                            delete storyTextElement.dataset.generating;
+                        });
+            
         });
     });
 }
+function showExportPreview() {
+    if (!gameState.storyTree || gameState.storyTree.length === 0) {
+        alert('暂无章节内容可导出');
+        return;
+    }
+
+    const previewContainer = document.getElementById('exportPreviewContent');
+    previewContainer.innerHTML = ''; // 清空预览区
+    if (!previewContainer) {
+        console.error("找不到 #exportPreviewContent 元素");
+        return; // 提前退出
+    }
+    
+    // 生成预览内容
+    gameState.storyTree.forEach(chapter => {
+        const chapterBox = document.createElement('div');
+        chapterBox.style.marginBottom = '30px';
+        chapterBox.style.paddingBottom = '20px';
+        chapterBox.style.borderBottom = '1px dashed #ddd';
+
+        // 章节标题
+        const title = document.createElement('h3');
+        title.textContent = `第${chapter.id}章：${chapter.title || '未命名章节'}`;
+        title.style.color = '#333';
+        title.style.marginTop = '0';
+        chapterBox.appendChild(title);
+
+        // 章节内容
+        const content = document.createElement('div');
+        content.textContent = chapter.content || '（该章节暂无内容）';
+        content.style.lineHeight = '1.8';
+        content.style.color = '#666';
+        content.style.whiteSpace = 'pre-wrap'; // 保留换行
+        chapterBox.appendChild(content);
+
+        previewContainer.appendChild(chapterBox);
+    });
+
+    // 显示预览窗口（关键：确保弹窗显示）
+    const modal = document.getElementById('exportPreviewModal');
+    modal.style.display = 'block'; // 或使用 modal.classList.add('active')
+}
+
 
 // 选择章节
 function selectChapter(chapter) {
@@ -1990,6 +2401,10 @@ function selectChapter(chapter) {
     document.getElementById('storyText').textContent = chapter.content || '点击左侧按钮生成此章节内容...';
     document.getElementById('storyText').dataset.nodeId = chapter.id;
     document.getElementById('currentChapter').textContent = chapter.title;
+
+
+    const storyImage = document.getElementById('storyImage');
+    storyImage.src = chapter.image|| 'test.png'; // 如果没有图片，使用占位图
     
     // 高亮当前节点
     document.querySelectorAll('.tree-node').forEach(node => {
@@ -2002,11 +2417,7 @@ function selectChapter(chapter) {
     }
     
     // 生成新的场景图片（如果有内容）
-    if (chapter.content) {
-        regenerateImage(chapter.content);
-    } else {
-        document.getElementById('storyImage').src = 'test.png';
-    }
+
     
     // 保存当前章节
     saveGameState();
@@ -2134,6 +2545,103 @@ async function generateChapterContentStream(chapterId) {
 
 
 
+// 生成TXT文件并下载
+// 生成TXT文件并下载（修复版）
+function generateChaptersTxt() {
+    // 验证是否有章节数据
+    if (!gameState.storyTree || gameState.storyTree.length === 0) {
+        showToast('没有可导出的章节数据', true);
+        return;
+    }
+
+    // 构建TXT内容
+    let txtContent = "故事章节内容导出\n";
+    txtContent += "=".repeat(50) + "\n\n";
+
+    gameState.storyTree.forEach((chapter, index) => {
+        // 章节标题（带序号）
+        txtContent += `【第${chapter.id}章】${chapter.title}\n`;
+        txtContent += "-".repeat(40) + "\n";
+        
+        // 直接使用chapter.content而非DOM查询（修复点）
+        txtContent += chapter.content || "（该章节暂无内容）\n\n";
+        txtContent += "=".repeat(50) + "\n\n";
+    });
+
+    // 创建Blob对象
+    const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+    
+    // 创建下载链接
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    
+    // 生成文件名（包含当前日期）
+    const date = new Date();
+    const fileName = `故事章节_${date.getFullYear()}${(date.getMonth()+1).toString().padStart(2,'0')}${date.getDate().toString().padStart(2,'0')}.txt`;
+    a.download = fileName;
+    
+    // 触发下载
+    document.body.appendChild(a);
+    a.click();
+    
+    // 清理资源
+    setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }, 100);
+
+    // 显示提示并记录历史
+    showToast(`已成功导出${gameState.storyTree.length}章内容到TXT文件`);
+    addToHistory({
+        title: "导出TXT",
+        content: `将所有章节内容导出为TXT文件：${fileName}`
+    });
+}
+
+// 为保存按钮添加生成TXT文件的功能（假设按钮class为save-btn）
+// 替换原保存按钮事件绑定
+document.addEventListener('DOMContentLoaded', function() {
+    const saveBtn = document.querySelector('.save-btn');
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            // 1. 先保存数据到本地存储
+            const chaptersData = gameState.storyTree.map(chapter => ({
+                id: chapter.id,
+                title: chapter.title,
+                content: chapter.content
+            }));
+            localStorage.setItem('allChaptersData', JSON.stringify(chaptersData));
+            
+            // 2. 显示导出预览弹窗（关键修改）
+            showExportPreview(); // 先显示预览，不再直接调用generateChaptersTxt()
+        });
+    } else {
+        console.warn('未找到保存按钮，无法绑定TXT导出功能');
+    }
+});
+
+
+// 确保HTML中有导出预览弹窗的下载按钮
+// <button id="confirmExportBtn">确认下载TXT</button>
+
+// document.addEventListener('DOMContentLoaded', function() {
+//     // 绑定确认下载按钮事件
+//     const confirmBtn = document.getElementById('confirmExportBtn');
+//     if (confirmBtn) {
+//         confirmBtn.addEventListener('click', function() {
+//             // 执行实际下载
+//             generateChaptersTxt();
+//             // 关闭预览弹窗
+//             document.getElementById('exportPreviewModal').style.display = 'none';
+//         });
+//     }
+// });
+
+
+
+
+//============================================================================================================
 
 
 function initializeModalHandlers() {
@@ -2169,6 +2677,36 @@ function initializeModalHandlers() {
     });
 }
 
+
+
+function downloadTxtFile() {
+  let txtContent = "小说内容导出\n";
+  txtContent += "=".repeat(60) + "\n\n";
+
+  // 拼接所有章节内容
+  gameState.storyTree.forEach(chapter => {
+    txtContent += `第${chapter.id}章：${chapter.title || '未命名章节'}\n`;
+    txtContent += "-".repeat(50) + "\n";
+    txtContent += chapter.content || "（无内容）\n\n";
+    txtContent += "=".repeat(60) + "\n\n";
+  });
+
+  // 创建并下载文件
+  const blob = new Blob([txtContent], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `小说导出_${new Date().toLocaleDateString()}.txt`;
+  document.body.appendChild(a);
+  a.click();
+
+  // 清理资源并关闭窗口
+  setTimeout(() => {
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    document.getElementById('exportPreviewModal').style.display = 'none';
+  }, 100);
+}
 // 修复标题编辑逻辑
 // 修复标题编辑逻辑
 function initializeTitleEditing() {
@@ -2243,7 +2781,7 @@ function initializeTitleEditing() {
         if (!titleElement || titleElement.classList.contains('edit-mode')) return;
         
         titleElement.classList.add('edit-mode');
-        titleElement.contentEditable = true;
+        titleElement.contentEditable = false;
         titleElement.focus();
         
         const originalTitle = titleElement.textContent;
@@ -2301,6 +2839,19 @@ function initializeTitleEditing() {
         }, { once: true });
     });
 }
+
+// document.addEventListener('DOMContentLoaded', function() {
+//   // 绑定取消按钮事件
+//   const cancelBtn = document.getElementById('cancelExportBtn');
+//   if (cancelBtn) { // 检查元素是否存在
+//     cancelBtn.addEventListener('click', function() {
+//       const modal = document.getElementById('exportPreviewModal');
+//       if (modal) modal.style.display = 'none';
+//     });
+//   } else {
+//     console.warn('未找到取消按钮元素');
+//   }
+// });
 // 等待DOM加载完成
 document.addEventListener('DOMContentLoaded', function() {
 
@@ -2324,8 +2875,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const saveModalBtn = document.querySelector('.save-modal-btn');
     const cancelModalBtn = document.querySelectorAll('.cancel-modal-btn');
     const closeModalBtn = document.querySelectorAll('.close-modal');
+     const saveBtn = document.querySelector('.save-btn');
+  if (saveBtn) {
+    saveBtn.addEventListener('click', showExportPreview);
+  }
 
-    
+  // 绑定取消按钮事件
+  document.getElementById('cancelExportBtn').addEventListener('click', function() {
+    document.getElementById('exportPreviewModal').style.display = 'none';
+  });
+
+  // 绑定关闭按钮（X）事件
+  document.querySelector('.close-modal').addEventListener('click', function() {
+    document.getElementById('exportPreviewModal').style.display = 'none';
+  });
+
+  // 点击模态框外部关闭
+  window.addEventListener('click', function(event) {
+    const modal = document.getElementById('exportPreviewModal');
+    if (event.target === modal) {
+      modal.style.display = 'none';
+    }
+  });
+
+  // 绑定下载按钮事件
+  document.getElementById('confirmExportBtn').addEventListener('click', downloadTxtFile);
+
     // 当前编辑目标
     let currentEditTarget = null;
     
@@ -2368,7 +2943,7 @@ document.addEventListener('DOMContentLoaded', function() {
             saveGameState();
             
             // 记录修改历史
-            addEditHistory(currentEditTarget === stageTitle ? '标题' : '剧情内容', modalInput.value.trim());
+            // addEditHistory(currentEditTarget === stageTitle ? '标题' : '剧情内容', modalInput.value.trim());
             
             // 关闭模态框
             closeModal();
@@ -2377,7 +2952,19 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
-    // 添加修改历史记录
+       
+    const loginNavBtn = document.querySelector('.load-btn');
+    
+    
+    // 确保按钮存在
+    if (loginNavBtn) {
+        // 点击按钮时跳转到setting.html
+        loginNavBtn.addEventListener('click', function() {
+            // 跳转到setting.html页面
+            window.location.href = 'setting.html';
+        });
+    }
+
     function addEditHistory(type, content) {
         const historyContent = document.getElementById('storyHistory');
         const timestamp = new Date().toLocaleString();

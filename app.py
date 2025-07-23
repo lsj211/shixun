@@ -348,7 +348,7 @@ async def generate_background(request: BackgroundGenerationRequest):
     # 步骤 1: 根据背景推断小说类型（这里直接假设是科幻）
     # genre = "玄幻"  # 假设从分类模型中得到了该结果
     genre = result["labels"][0]
-
+    
     global storytheme
     storytheme=genre
 
