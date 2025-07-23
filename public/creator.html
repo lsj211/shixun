@@ -18,7 +18,7 @@
             </div>
             <div class="tree-controls">
     <button class="tree-btn edit-title-btn" title="编辑标题"><i class="fas fa-edit"></i> 编辑标题</button>
-    <button class="tree-btn back-btn" title="更新内容"><i class="fas fa-history"></i> 更新内容</button>
+    
 </div>
         </aside>
 
@@ -43,7 +43,7 @@
   </div>
                 <div class="story-image-container">
                     <img id="storyImage" src="test.png" alt="场景图片">
-                    <button class="regenerate-image-btn" title="重新生成插画"><i class="fas fa-sync-alt"></i></button>
+                    
                 </div>
                 <div class="story-text-container">
                     <p id="storyText" class="story-text"></p>
@@ -86,7 +86,7 @@
             <div class="story-info">
                 <h3>故事信息</h3>
                 <div class="info-content">
-                    <p><strong>背景：</strong><span id="storyBackground"></span></p>
+                    <!-- <p><strong>背景：</strong><span id="storyBackground"></span></p> -->
                     <p><strong>当前章节：</strong><span id="currentChapter"></span></p>
                     
                 </div>
@@ -96,10 +96,24 @@
                 <button class="control-btn character-info-btn"><i class="fas fa-users"></i> 角色设定</button>
             </div>
             <div class="game-controls">
-                <button class="control-btn save-btn"><i class="fas fa-save"></i> 保存进度</button>
-                <button class="control-btn load-btn"><i class="fas fa-folder-open"></i> 读取进度</button>
-                <button class="control-btn settings-btn"><i class="fas fa-cog"></i> 设置</button>
-                <button class="control-btn help-btn"><i class="fas fa-question-circle"></i> 帮助</button>
+                <button class="control-btn save-btn"><i class="fas fa-save"></i> 导出小说</button>
+                <div id="exportPreviewModal" class="modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); padding: 20px; box-sizing: border-box;">
+  <div class="modal-content" style="background-color: white; margin: 5% auto; padding: 20px; border-radius: 8px; width: 80%; max-width: 1000px; max-height: 80vh; overflow-y: auto; position: relative;">
+    <div class="modal-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 15px; margin-bottom: 20px;">
+      <h2 style="margin: 0;">小说导出预览</h2>
+      <span class="close-modal" style="cursor: pointer; font-size: 28px;">&times;</span>
+    </div>
+    <div class="modal-body" id="exportPreviewContent" style="padding: 10px 0;">
+      <!-- 动态内容将在这里生成 -->
+    </div>
+    <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 15px; padding: 15px 0; border-top: 1px solid #eee; margin-top: 20px;">
+      <button id="cancelExportBtn" style="padding: 8px 20px; border: 1px solid #ccc; border-radius: 4px; cursor: pointer; background: #f5f5f5;">取消</button>
+      <button id="confirmExportBtn" style="padding: 8px 20px; border: none; border-radius: 4px; cursor: pointer; background: #4CAF50; color: white;">下载小说</button>
+    </div>
+  </div>
+</div>
+                <button class="control-btn load-btn"><i class="fas fa-folder-open"></i> 退出</button>
+               
             </div>
             <div class="story-history">
                 <h3>剧情修改记录</h3>
@@ -130,17 +144,10 @@
             <h2>故事背景</h2>
             <div class="story-info-content">
                 <div class="background-section">
-                    <h3>世界观设定</h3>
+                    <h3></h3>
                     <p id="worldBackground"></p>
                 </div>
-                <div class="timeline-section">
-                    <h3>时间线</h3>
-                    <div id="storyTimeline"></div>
-                </div>
-                <div class="location-section">
-                    <h3>重要地点</h3>
-                    <div id="importantLocations"></div>
-                </div>
+                
             </div>
         </div>
     </div>
@@ -200,4 +207,5 @@
     <script src="js/creator.js"></script>
 </body>
 </html>
+
 

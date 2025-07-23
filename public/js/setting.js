@@ -5,9 +5,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const prevButtons = document.querySelectorAll('.prev-btn');
     const progressContainer = document.querySelector('.progress-container');
     const progressSteps = document.querySelectorAll('.progress-step');
-    
+    let currentMode = '';
     // 更新进度条状态
     function updateProgress(currentStep) {
+        console.log('更新进度条，当前步骤:', currentStep);
         // 重置所有状态
         progressSteps.forEach(step => {
             step.classList.remove('completed', 'active');
@@ -22,6 +23,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // 设置当前步骤
         if (progressSteps[currentStep - 1]) {
+            console.log('progressSteps 长度:', progressSteps.length);
+            console.log('currentStep 值:', currentStep);
+            console.log('设置当前步骤:', currentStep);
+            // progressSteps[currentStep - 1].classList.add('active');
+            console.log('设置当前步骤:', currentStep);
             progressSteps[currentStep - 1].classList.add('active');
         }
         
@@ -47,7 +53,14 @@ document.addEventListener('DOMContentLoaded', () => {
     // 下一步按钮事件
     nextButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            let currentStep;
+            if (currentMode === 'game') {
+                currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            } else {
+                console.log('当前模式:', currentMode);
+                currentStep = parseInt(this.closest('.setting-step').id.split('-')[3]) + 4;
+                console.log('当前步骤:', currentStep);
+            }
             if (currentStep < steps.length) {
                 showStep(currentStep);
             }
@@ -57,13 +70,43 @@ document.addEventListener('DOMContentLoaded', () => {
     // 上一步按钮事件
     prevButtons.forEach(button => {
         button.addEventListener('click', function() {
-            const currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            let currentStep;
+            if (currentMode === 'game') {
+                currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            } else {
+                currentStep = parseInt(this.closest('.setting-step').id.split('-')[3]) + 4;
+            }
             if (currentStep > 1) {
-                showStep(currentStep - 2);
+                if (currentMode === 'game') {
+                    showStep(currentStep - 2);
+                } else {
+                    showStep(currentStep - 3);
+                }
             }
         });
     });
+
+    // nextButtons.forEach(button => {
+    //     button.addEventListener('click', function() {
+    //         console.log('Next button clicked');
+    //         const currentStep = parseInt(this.closest('.setting-step').id.split('-')[3]);
+    //         console.log('Current step:', currentStep);
+    //         if (currentStep < steps.length) {
+    //             console.log('Showing step:', currentStep + 1);
+    //             showStep(currentStep);
+    //         }
+    //     });
+    // });
     
+    // // 上一步按钮事件
+    // prevButtons.forEach(button => {
+    //     button.addEventListener('click', function() {
+    //         const currentStep = parseInt(this.closest('.setting-step').id.split('-')[3]);
+    //         if (currentStep > 1) {
+    //             showStep(currentStep - 3);
+    //         }
+    //     });
+    // });
     // 初始化显示第一步
     showStep(0);
 
@@ -81,7 +124,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const newArchiveBtn = document.getElementById('new-archive-btn');
 
         // 当前模式标记
-        let currentMode = '';
+        // let currentMode = '';
 
         // 初始只显示模式选择区
         archiveSection.classList.add('hidden');
@@ -97,8 +140,9 @@ document.addEventListener('DOMContentLoaded', () => {
         createModeBtn.addEventListener('click', () => {
             currentMode = 'create';
             modeSelection.classList.add('hidden');
-            archiveSection.classList.remove('hidden');
-            renderArchiveList();
+            console.log('切换到创作模式');  
+            archiveSection.classList.add('hidden');
+           
         });
 
         // 渲染存档列表，按模式区分key
@@ -201,7 +245,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // const createModeSettings = document.getElementById('create-mode-settings');
     
     // 创作模式类型选择
-    const textBasedBtn = document.getElementById('text-based-btn');
+    const textBasedBtn = document.getElementById('create-mode-btn');
     const imageBasedBtn = document.getElementById('image-based-btn');
     const textBasedSettings = document.getElementById('text-based-settings');
     const imageBasedSettings = document.getElementById('image-based-settings');
@@ -357,7 +401,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const createSteps = [
         document.getElementById('create-text-step-1'),
         document.getElementById('create-text-step-2'),
-        document.getElementById('create-text-step-3'),
+        // document.getElementById('create-text-step-3'),
         document.getElementById('create-text-step-4')
     ];
 
@@ -384,12 +428,21 @@ const createSteps = [
                         }
                     }
                 }
+                
                 step.classList.add('hidden');
                 createSteps[index + 1].classList.remove('hidden');
             });
         }
     });
 
+     nextButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const currentStep = parseInt(this.closest('.setting-step').id.split('-')[2]);
+            if (currentStep < steps.length) {
+                showStep(currentStep);
+            }
+        });
+    });
     // 上一步按钮逻辑
     createSteps.forEach((step, index) => {
         if (index > 0) {
@@ -484,7 +537,7 @@ const createSteps = [
                 mode: 'creative',
                 type: 'text',
                 background: document.getElementById('create-story-background').value,
-                complexity: document.querySelector('input[name="create-complexity"]:checked').value,
+                // complexity: document.querySelector('input[name="create-complexity"]:checked').value,
                 chapterCount: document.getElementById('create-chapter-count').value,
                 characters: []
             };
@@ -613,21 +666,21 @@ const createSteps = [
                 throw new Error('故事背景太短，无法生成有意义的角色');
             }
             
-            // 添加默认角色作为备用
-            const timeoutId = setTimeout(() => {
-                // 先检查是否已经完成生成
-                if (!isGeneratingCharacters) return;
+            // // 添加默认角色作为备用
+            // const timeoutId = setTimeout(() => {
+            //     // 先检查是否已经完成生成
+            //     if (!isGeneratingCharacters) return;
                 
-                console.log("生成超时，创建默认角色..."); // 调试日志
+            //     console.log("生成超时，创建默认角色..."); // 调试日志
                 
-                // 如果30秒后还在生成中，则使用默认角色
-                charactersContainer.innerHTML = '';
-                addCharacterInput(charactersContainer, "主角", "这是故事的主角，你可以编辑名称和描述。");
-                addCharacterInput(charactersContainer, "配角", "这是故事的配角，你可以编辑名称和描述。");
+            //     // 如果30秒后还在生成中，则使用默认角色
+            //     charactersContainer.innerHTML = '';
+            //     addCharacterInput(charactersContainer, "主角", "这是故事的主角，你可以编辑名称和描述。");
+            //     addCharacterInput(charactersContainer, "配角", "这是故事的配角，你可以编辑名称和描述。");
                 
-                // 标记为已完成，避免重复处理
-                isGeneratingCharacters = false;
-            }, 300000); // 30秒超时
+            //     // 标记为已完成，避免重复处理
+            //     isGeneratingCharacters = false;
+            // }, 300000); // 30秒超时
             
             console.log("准备调用API..."); // 调试日志
             
@@ -1189,11 +1242,6 @@ const createSteps = [
         }
     });
     
-    imageBasedBtn.addEventListener('click', () => {
-        imageBasedSettings.classList.remove('hidden');
-        textBasedSettings.classList.add('hidden');
-    });
-    
     // 添加类似的逻辑处理创作模式的步骤导航和数据收集
     // 这部分代码与游玩模式类似，这里省略...
     
@@ -1203,7 +1251,7 @@ const createSteps = [
         input.dataset.firstGenerated = "false";
         input.addEventListener('blur', async function() {
             const text = this.value.trim();
-            if (text.length > 0&& this.dataset.firstGenerated === "false") {
+            if (text.length > 0&& this.dataset.firstGenerated === "false"&& currentMode=="game") {
                 try {
                     const enhancedBackground = await generateEnhancedBackground(text);
                     if (enhancedBackground && confirm('我们生成了更详细的背景描述，是否替换当前内容？')) {

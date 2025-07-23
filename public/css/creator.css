@@ -38,7 +38,7 @@ body {
 
 .character-avatar img {
     width: 100px;
-    height: 100px;
+    height: 200px;
     border-radius: 50%;
     margin-bottom: 10px;
 }
@@ -423,12 +423,37 @@ body {
     background: rgba(255,255,255,0.9);
     border: none;
     border-radius: 50%;
-    width: 80px;
-    height: 80px;
+    width: 0px;
+    height: 0px;
     cursor: pointer;
     box-shadow: 0 2px 5px rgba(0,0,0,0.2);
 }
+#exportPreviewModal {
+    display: none; /* 默认隐藏 */
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+    justify-content: center;
+    align-items: center;
+}
 
+#exportPreviewModal.active {
+    display: flex; /* 显示弹窗 */
+}
+
+.modal-content {
+    background: white;
+    width: 80%;
+    max-width: 800px;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 20px;
+    border-radius: 8px;
+}
 .story-text-container {
     position: relative;
     padding: 20px;
@@ -616,7 +641,8 @@ body {
 
 .character-info-image {
     width: 100%;
-    height: 200px;
+    /* height: 300px; */
+    aspect-ratio: 1 / 1;
     object-fit: cover;
 }
 
@@ -772,7 +798,7 @@ body {
 #storyImage {
     transition: opacity 0.1s ease;
      width: 400px;
-    height: 300px;
+    height: 400px;
 }
 
 /* 响应式设计 */

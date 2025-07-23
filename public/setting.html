@@ -119,14 +119,24 @@
         <!-- 创作模式设定区 -->
         <section id="create-mode-settings" class="settings-panel hidden">
             <h2>创作模式设定</h2>
-            
-            <div class="create-mode-type">
-                <h3>创作方式选择</h3>
-                <div class="creation-type-buttons">
-                    <button id="text-based-btn" class="type-btn">文字创作</button>
-                    <button id="image-based-btn" class="type-btn">图片创作</button>
+            <div class="progress-container">
+                <div class="progress-step completed active" data-step="1">
+                    <span class="step-number">1</span>
+                    <span class="step-label">故事背景</span>
+                </div>
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="2">
+                    <span class="step-number">2</span>
+                    <span class="step-label">角色设定</span>
+                </div>
+              
+                <div class="progress-line"></div>
+                <div class="progress-step" data-step="3">
+                    <span class="step-number">3</span>
+                    <span class="step-label">章节数</span>
                 </div>
             </div>
+
             
             <div id="text-based-settings" class="creation-settings hidden">
                 <div class="setting-step" id="create-text-step-1">
@@ -152,7 +162,7 @@
                 </div>
                 
                 <div class="setting-step hidden" id="create-text-step-3">
-                    <h3>步骤 3: 分支复杂度</h3>
+                    <!-- <h3>步骤 3: 分支复杂度</h3>
                     <div class="complexity-selector">
                         <label>
                             <input type="radio" name="create-complexity" value="simple"> 简单 (少量分支)
@@ -167,11 +177,11 @@
                     <div class="navigation-buttons">
                         <button class="prev-btn">上一步</button>
                         <button class="next-btn">下一步</button>
-                    </div>
+                    </div> -->
                 </div>
                 
                 <div class="setting-step hidden" id="create-text-step-4">
-                    <h3>步骤 4: 章节数</h3>
+                    <h3>步骤 3: 章节数</h3>
                     <div class="chapter-selector">
                         <input type="range" id="create-chapter-count" min="3" max="15" value="5">
                         <span id="create-chapter-display">5 章</span>
